@@ -318,12 +318,32 @@ class BattleRoyaleSimulator {
             
             let statusText = player.status.charAt(0).toUpperCase() + player.status.slice(1);
             if (player.status === 'dead' && player.round_eliminated) {
-                statusText += ` (Round ${player.round_eliminated})`;
+                statusText += ` (R${player.round_eliminated})`;
             }
             
+            // Calculate HP percentage for progress bar
+            const maxHP = 120; // Based on the HP generation range (80-120)
+            const hpPercentage = Math.max(0, (player.hp / maxHP) * 100);
+            
+            // Generate player avatar (simple emoji based on name first letter)
+            const avatarEmojis = {
+                'A': '🏹', 'B': '⚔️', 'C': '🔧', 'D': '🛡️', 'E': '🌲', 'F': '🏃',
+                'G': '🎭', 'H': '⚕️', 'I': '⚡', 'J': '🏃', 'K': '🥋', 'L': '💪',
+                'M': '🕵️', 'N': '🏃‍♂️', 'O': '🛡️', 'P': '🔨', 'Q': '🎯', 'R': '🌊',
+                'S': '📖', 'T': '💥', 'U': '🗡️', 'V': '🤝', 'W': '❄️', 'Z': '⚡'
+            };
+            const avatar = avatarEmojis[player.name.charAt(0)] || '👤';
+            
             playerDiv.innerHTML = `
-                <span class="player-name">${player.name}</span>
-                <span class="player-status status-${player.status}">${statusText}</span>
+                <div class="player-avatar">${avatar}</div>
+                <div class="player-name">${player.name}</div>
+                <div class="player-hp-container">
+                    <span class="player-hp-label">HP: ${player.hp}/${maxHP}</span>
+                    <div class="player-hp-bar">
+                        <div class="player-hp-fill ${player.status}" style="width: ${hpPercentage}%"></div>
+                    </div>
+                </div>
+                <div class="player-status status-${player.status}">${statusText}</div>
             `;
             
             // Add click event listener to show player info
