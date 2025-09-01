@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battle Royale Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Battle Royale Simulator</h1>
+            <div class="controls">
+                <input type="password" id="apiKey" placeholder="Enter OpenAI API Key" />
+                <button id="startGame">Start Game</button>
+                <button id="nextEvent" disabled>Next Event</button>
+                <button id="resetGame">Reset Game</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="game-info">
+                <div class="stat">
+                    <span class="label">Round:</span>
+                    <span id="roundNumber">0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Players Alive:</span>
+                    <span id="playersAlive">24</span>
+                </div>
+                <div class="stat">
+                    <span class="label">Players Injured:</span>
+                    <span id="playersInjured">0</span>
+                </div>
+            </div>
+
+            <div class="game-content">
+                <div class="events-section">
+                    <h2>Events</h2>
+                    <div id="eventsLog"></div>
+                </div>
+
+                <div class="players-section">
+                    <h2>Players</h2>
+                    <div id="playersList"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
