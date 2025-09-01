@@ -15,18 +15,64 @@ class BattleRoyaleSimulator {
         document.getElementById('startGame').addEventListener('click', () => this.startGame());
         document.getElementById('nextEvent').addEventListener('click', () => this.nextEvent());
         document.getElementById('resetGame').addEventListener('click', () => this.resetGame());
+        
+        // Modal event listeners
+        const modal = document.getElementById('playerModal');
+        const closeBtn = document.querySelector('.close');
+        
+        closeBtn.addEventListener('click', () => this.hidePlayerModal());
+        
+        // Close modal when clicking outside of it
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                this.hidePlayerModal();
+            }
+        });
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                this.hidePlayerModal();
+            }
+        });
     }
 
     generatePlayers() {
-        const playerNames = [
-            'Alex', 'Blake', 'Casey', 'Drew', 'Ellis', 'Finley', 'Gray', 'Harper',
-            'Iris', 'Jordan', 'Kai', 'Logan', 'Morgan', 'Nico', 'Oakley', 'Parker',
-            'Quinn', 'River', 'Sage', 'Taylor', 'Uma', 'Vale', 'Winter', 'Zara'
+        const playerData = [
+            { name: 'Alex', description: 'A skilled archer with keen eyesight and steady hands. Known for precise long-range attacks.' },
+            { name: 'Blake', description: 'A former street fighter with quick reflexes and excellent close combat skills.' },
+            { name: 'Casey', description: 'A tech specialist who excels at finding and using advanced equipment.' },
+            { name: 'Drew', description: 'A natural leader with strong tactical awareness and team coordination abilities.' },
+            { name: 'Ellis', description: 'A survivalist with extensive wilderness knowledge and trap-setting expertise.' },
+            { name: 'Finley', description: 'An agile parkour expert capable of traversing difficult terrain with ease.' },
+            { name: 'Gray', description: 'A mysterious strategist who prefers stealth and psychological warfare.' },
+            { name: 'Harper', description: 'A medic with healing abilities and knowledge of battlefield medicine.' },
+            { name: 'Iris', description: 'A fierce warrior with exceptional melee combat skills and unwavering courage.' },
+            { name: 'Jordan', description: 'A versatile athlete with balanced skills across multiple combat disciplines.' },
+            { name: 'Kai', description: 'A martial artist with lightning-fast strikes and defensive techniques.' },
+            { name: 'Logan', description: 'A heavy weapons specialist with incredible strength and endurance.' },
+            { name: 'Morgan', description: 'A cunning tactician who excels at setting ambushes and traps.' },
+            { name: 'Nico', description: 'A scout with exceptional speed and reconnaissance abilities.' },
+            { name: 'Oakley', description: 'A defensive expert skilled in shield work and protective strategies.' },
+            { name: 'Parker', description: 'An engineer who can improvise weapons and tools from available materials.' },
+            { name: 'Quinn', description: 'A sniper with exceptional patience and long-range precision shooting.' },
+            { name: 'River', description: 'A fluid combatant who adapts their fighting style to any situation.' },
+            { name: 'Sage', description: 'A wise strategist with deep knowledge of combat theory and history.' },
+            { name: 'Taylor', description: 'An explosive specialist with expertise in demolitions and area denial.' },
+            { name: 'Uma', description: 'A stealthy assassin who strikes from the shadows with deadly precision.' },
+            { name: 'Vale', description: 'A support specialist who excels at team tactics and resource management.' },
+            { name: 'Winter', description: 'A cold and calculating fighter with ice-cold nerves under pressure.' },
+            { name: 'Zara', description: 'A fearless berserker who fights with wild intensity and raw power.' }
         ];
 
-        this.players = playerNames.map((name, index) => ({
+        this.players = playerData.map((data, index) => ({
             id: index + 1,
-            name: name,
+            name: data.name,
+            description: data.description,
+            hp: 80 + Math.floor(Math.random() * 41), // 80-120 HP
+            strength: 1 + Math.floor(Math.random() * 10), // 1-10
+            agility: 1 + Math.floor(Math.random() * 10), // 1-10
+            intelligence: 1 + Math.floor(Math.random() * 10), // 1-10
             status: 'alive', // alive, injured, dead
             round_eliminated: null
         }));
@@ -280,8 +326,44 @@ class BattleRoyaleSimulator {
                 <span class="player-status status-${player.status}">${statusText}</span>
             `;
             
+            // Add click event listener to show player info
+            playerDiv.addEventListener('click', () => this.showPlayerModal(player));
+            
             playersList.appendChild(playerDiv);
         });
+    }
+
+    showPlayerModal(player) {
+        // Populate modal with player data
+        document.getElementById('modalPlayerName').textContent = player.name;
+        document.getElementById('modalPlayerDescription').textContent = player.description;
+        document.getElementById('modalPlayerHP').textContent = player.hp;
+        document.getElementById('modalPlayerStrength').textContent = player.strength;
+        document.getElementById('modalPlayerAgility').textContent = player.agility;
+        document.getElementById('modalPlayerIntelligence').textContent = player.intelligence;
+        
+        // Set status badge
+        const statusBadge = document.getElementById('modalPlayerStatus');
+        statusBadge.textContent = player.status;
+        statusBadge.className = `status-badge ${player.status}`;
+        
+        // Set status details
+        let statusDetails = '';
+        if (player.status === 'dead' && player.round_eliminated) {
+            statusDetails = `Eliminated in Round ${player.round_eliminated}`;
+        } else if (player.status === 'injured') {
+            statusDetails = 'Wounded but still fighting';
+        } else if (player.status === 'alive') {
+            statusDetails = 'Ready for battle';
+        }
+        document.getElementById('modalPlayerStatusDetails').textContent = statusDetails;
+        
+        // Show modal
+        document.getElementById('playerModal').style.display = 'block';
+    }
+
+    hidePlayerModal() {
+        document.getElementById('playerModal').style.display = 'none';
     }
 }
 
