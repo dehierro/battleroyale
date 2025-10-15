@@ -21,13 +21,7 @@
                 <div class="control-buttons">
                     <button id="configurePlayers" class="secondary">Configurar jugadores</button>
                     <button id="startGame" class="primary">Comenzar simulación</button>
-                    <button id="pauseGame" disabled>Pausar</button>
                     <button id="resetGame" class="danger">Reiniciar</button>
-                </div>
-                <div class="speed-control">
-                    <label for="eventDelay">Velocidad</label>
-                    <input type="range" id="eventDelay" min="3" max="15" step="1" value="8" />
-                    <span id="eventDelayLabel">8 s</span>
                 </div>
             </div>
         </header>
@@ -53,9 +47,12 @@
             </section>
 
             <section class="timeline">
-                <div class="section-header">
-                    <h2>Relato de eventos</h2>
-                    <p class="section-subtitle">Cada turno se genera automáticamente usando el estado actual del juego y los antecedentes de los jugadores.</p>
+                <div class="section-header with-action">
+                    <div>
+                        <h2>Relato de eventos</h2>
+                        <p class="section-subtitle">Cada turno se genera automáticamente usando el estado actual del juego y los antecedentes de los jugadores.</p>
+                    </div>
+                    <button id="nextEvent" class="primary" disabled>Siguiente evento</button>
                 </div>
                 <div id="eventsLog" class="events-log"></div>
             </section>
@@ -97,8 +94,8 @@
                             <span class="stat-value" id="modalPlayerInjuries"></span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Estado mental</span>
-                            <span class="stat-value" id="modalPlayerMental"></span>
+                            <span class="stat-label">Estado</span>
+                            <span class="stat-value" id="modalPlayerState"></span>
                         </div>
                     </div>
                 </div>
@@ -111,7 +108,9 @@
             <button class="close" aria-label="Cerrar">&times;</button>
             <div class="config-header">
                 <h2 id="configTitle">Configurar jugadores</h2>
-                <p>Introduce 24 jugadores en formato JSON. Puedes incluir <code>name</code>, <code>image</code>, <code>hp</code>, <code>injuries</code>, <code>mentalState</code> y <code>bio</code>.</p>
+                <p>Introduce 24 jugadores en formato JSON. Puedes incluir <code>name</code>, <code>image</code>, <code>hp</code>, <code>maxHp</code>, <code>injuries</code>, <code>state</code> y <code>bio</code>.</p>
+                <p class="config-note">Los datos iniciales se cargan desde <code>data/players.json</code> y las imágenes locales desde <code>images/players</code>. Ajusta esos archivos para personalizar la plantilla.</p>
+                <p class="config-note">La propiedad <code>state</code> indica estados anómalos (por ejemplo, "Pierna rota"). Déjala vacía si el jugador no presenta novedades.</p>
             </div>
             <textarea id="playersConfig" spellcheck="false"></textarea>
             <div class="config-actions">
