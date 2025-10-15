@@ -222,25 +222,24 @@ class BattleRoyaleSimulator {
             return;
         }
 
+        const plan = this.planEventOutcome(alivePlayers);
+
         this.isProcessingEvent = true;
         this.round += 1;
         this.updateNextEventButton();
         this.addEvent(`⏳ Generando evento de la ronda ${this.round}...`, true);
 
         try {
-            const eventPayload = await this.generateEvent();
+            const eventDescription = await this.generateEvent(plan);
             this.removeLoadingEvents();
-            if (eventPayload?.eventText) {
-                this.addEvent(eventPayload.eventText);
-            }
-            const outcomeLogs = this.applyEventOutcome(eventPayload?.eventOutcome);
-            outcomeLogs.forEach(log => this.addEvent(log));
+            this.addEvent(eventDescription);
+            this.applyPlannedOutcome(plan);
         } catch (error) {
             console.error(error);
             this.removeLoadingEvents();
-            const fallback = this.generateFallbackEvent();
+            const fallback = this.generateFallbackEvent(plan);
             this.addEvent(`⚠️ Error con la API (${error.message}). Evento alternativo: ${fallback}`);
-            this.applyRandomOutcome();
+            this.applyPlannedOutcome(plan);
         }
 
         this.updateDisplay();
@@ -251,50 +250,142 @@ class BattleRoyaleSimulator {
         }
     }
 
-    async generateEvent() {
-        const availablePlayers = this.players.filter(player => player.status !== 'dead');
-        if (!availablePlayers.length) {
-            throw new Error('No hay jugadores disponibles para generar un evento.');
+    planEventOutcome(alivePlayers) {
+        if (!alivePlayers.length) {
+            return { type: 'narrative', participants: [] };
         }
+
+        const roll = Math.random();
+        const maxParticipants = Math.min(3, alivePlayers.length);
+
+        const pickGroup = (mandatory = []) => {
+            const desired = Math.max(1, Math.floor(Math.random() * maxParticipants) + 1);
+            const participants = [...mandatory];
+            const pool = alivePlayers.filter(player => !participants.includes(player));
+            while (participants.length < desired && pool.length) {
+                const index = Math.floor(Math.random() * pool.length);
+                participants.push(pool.splice(index, 1)[0]);
+            }
+            return participants;
+        };
+
+        if (roll < 0.4) {
+            return {
+                type: 'narrative',
+                participants: pickGroup()
+            };
+        }
+
+        const victim = this.pickRandom(alivePlayers);
+        if (!victim) {
+            return {
+                type: 'narrative',
+                participants: pickGroup()
+            };
+        }
+
+        const participants = pickGroup([victim]);
+
+        if (roll < 0.75) {
+            const injuryOptions = [
+                'contusión en el hombro',
+                'corte profundo en el brazo',
+                'esguince de tobillo',
+                'quemadura leve',
+                'costillas magulladas',
+                'mareos persistentes'
+            ];
+            const stateOptions = [
+                'Pierna lesionada',
+                'Conmoción leve',
+                'Aturdido por la explosión',
+                'Infección incipiente',
+                'Pánico momentáneo'
+            ];
+            const baseDamage = 10 + Math.floor(Math.random() * 16);
+            if (victim.hp - baseDamage <= 0) {
+                return {
+                    type: 'elimination',
+                    participants,
+                    victim
+                };
+            }
+            return {
+                type: 'injury',
+                participants,
+                victim,
+                damage: Math.max(1, Math.min(baseDamage, victim.hp - 1)),
+                injury: this.pickRandom(injuryOptions),
+                newState: this.pickRandom(stateOptions) || 'Malherido'
+            };
+        }
+
+        return {
+            type: 'elimination',
+            participants,
+            victim
+        };
+    }
+
+    async generateEvent(plan) {
+        const alivePlayers = this.players.filter(player => player.status === 'alive');
+        const injuredPlayers = this.players.filter(player => player.status === 'injured');
+
+        const rosterSummary = alivePlayers
+            .map(player => {
+                const state = player.state ? player.state : 'sin novedades';
+                const injuries = player.injuries.length ? player.injuries.join(', ') : 'ninguna';
+                return `${player.name} (${player.hp} HP, lesiones: ${injuries}, estado: ${state})`;
+            })
+            .join('\n');
+
+        const bioContext = alivePlayers
+            .slice(0, 10)
+            .map(player => `${player.name}: ${player.bio}`)
+            .join('\n');
 
         const participants = this.selectParticipantsForEvent(availablePlayers);
         const trimmedContext = typeof this.globalContext === 'string' ? this.globalContext.trim() : '';
-        const contextText = trimmedContext || 'Sin contexto adicional proporcionado por el usuario.';
-        const participantBlocks = participants.map(player => {
-            const injuries = player.injuries.length ? player.injuries.join(', ') : 'ninguna';
-            const state = player.state ? player.state : 'sin novedades';
-            return `ID ${player.id} - ${player.name}\nEstado: ${player.status}\nHP: ${player.hp}/${player.maxHp}\nLesiones: ${injuries}\nEstado mental/físico: ${state}\nBiografía: ${player.bio}`;
-        }).join('\n\n');
+        const arenaContext = trimmedContext
+            ? `\nContexto general del escenario:\n${trimmedContext}\n`
+            : '';
 
-        const prompt = `Simulador de battle royale en español. Ronda ${this.round}.
-Contexto general: ${contextText}
+        const participants = Array.isArray(plan?.participants) && plan.participants.length
+            ? plan.participants
+            : alivePlayers.slice(0, Math.min(3, alivePlayers.length));
 
-Participantes involucrados en este evento:
-${participantBlocks}
+        const participantsSummary = participants
+            .map(player => {
+                const state = player.state ? player.state : 'sin novedades';
+                const injuries = player.injuries.length ? player.injuries.join(', ') : 'ninguna';
+                return `${player.name} (${player.hp} HP, lesiones: ${injuries}, estado: ${state})`;
+            })
+            .join('\n');
 
-Genera un evento breve en español (máximo 120 palabras) que solo involucre a los participantes listados. Mantén coherencia con sus estados actuales.
-Debes responder ÚNICAMENTE con un objeto JSON válido que siga exactamente esta estructura y orden de campos:
-{
-  "eventText": "Texto narrativo del evento en español",
-  "eventOutcome": {
-    "summary": "Resumen breve de las consecuencias",
-    "effects": [
-      {
-        "participantId": <ID numérico>,
-        "status": "alive" | "injured" | "dead",
-        "hpDelta": <número entero (negativo si pierde HP, positivo si gana HP, 0 si se mantiene)>,
-        "injuries": ["lista opcional de lesiones nuevas o agravadas"],
-        "state": "Descripción breve del estado mental o físico tras el evento"
-      }
-    ]
-  }
-}
-Reglas obligatorias:
-- Incluye exactamente un objeto de efecto por cada participante listado, sin añadir otros personajes.
-- Usa los IDs proporcionados.
-- Si un participante muere, su estado debe ser "dead" y el hpDelta reflejar el daño recibido.
-- Si no hay cambios para un participante, usa hpDelta 0, mantén su estado actual y deja injuries como un arreglo vacío.
-- El resumen debe ser coherente con los efectos listados.`;
+        const participantsNames = participants.map(player => player.name).join(', ');
+
+        let consequenceGuidance = 'Concluye el suceso aclarando que nadie resulta herido ni eliminado.';
+        if (plan?.type === 'injury' && plan?.victim) {
+            consequenceGuidance = `Describe cómo ${plan.victim.name} resulta herido en la escena y pierde ${plan.damage} puntos de vida. Menciona una lesión compatible (${plan.injury}) y deja constancia de que queda ${plan.newState}.`;
+        } else if (plan?.type === 'elimination' && plan?.victim) {
+            consequenceGuidance = `Narra de forma explícita cómo ${plan.victim.name} queda fuera de combate en esta misma escena.`;
+        }
+
+        const prompt = `Estamos en un simulador de battle royale en español. Describe un único evento autoconclusivo para la ronda ${this.round}.
+Datos del estado actual:
+- ${alivePlayers.length} jugadores vivos.
+- ${injuredPlayers.length} con lesiones.
+
+Lista breve de jugadores:
+${rosterSummary}
+
+Contexto biográfico:
+${bioContext}${arenaContext}
+
+Personajes implicados obligatorios:
+${participantsSummary}
+
+Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos personajes. El evento debe ser autoconclusivo: cierra la acción en la misma escena, sin cliffhangers ni promesas sobre eventos futuros. ${consequenceGuidance} No incluyas a ningún otro personaje ajeno a la lista (${participantsNames}).`;
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -425,44 +516,29 @@ Reglas obligatorias:
         return logs;
     }
 
-    applyRandomOutcome() {
-        const alivePlayers = this.players.filter(player => player.status === 'alive');
-        if (!alivePlayers.length) return;
-
-        const outcomeRoll = Math.random();
-        if (outcomeRoll < 0.4) {
-            // Evento narrativo sin daños.
-            this.addEvent('Nadie sufre consecuencias directas en esta ronda. La tensión crece.');
+    applyPlannedOutcome(plan) {
+        if (!plan) {
+            this.addEvent('No se pudo determinar el resultado del evento.');
             return;
         }
 
-        if (outcomeRoll < 0.75) {
-            const victim = this.pickRandom(alivePlayers);
-            if (!victim) return;
-            const damage = 10 + Math.floor(Math.random() * 16); // 10-25
+        if (plan.type === 'narrative' || !plan.participants?.length) {
+            return;
+        }
+
+        if (plan.type === 'injury' && plan.victim) {
+            const victim = plan.victim;
+            const damage = Math.max(1, Math.min(plan.damage ?? 10, victim.hp));
             victim.hp = Math.max(victim.hp - damage, 0);
-            const injuryOptions = [
-                'contusión en el hombro',
-                'corte profundo en el brazo',
-                'esguince de tobillo',
-                'quemadura leve',
-                'costillas magulladas',
-                'mareos persistentes'
-            ];
-            const newInjury = this.pickRandom(injuryOptions);
-            if (!victim.injuries.includes(newInjury)) {
-                victim.injuries.push(newInjury);
+            if (plan.injury && !victim.injuries.includes(plan.injury)) {
+                victim.injuries.push(plan.injury);
             }
-            victim.state = this.pickRandom([
-                'Pierna rota',
-                'Conmoción leve',
-                'Aturdido por explosión',
-                'Infección incipiente',
-                'Pánico momentáneo'
-            ]);
+            if (plan.newState) {
+                victim.state = plan.newState;
+            }
             if (victim.hp <= 0) {
                 this.eliminatePlayer(victim);
-                this.addEvent(`${victim.name} sucumbe a sus heridas y queda fuera del juego.`);
+                this.addEvent(`${victim.name} no resiste las heridas y queda eliminado.`);
             } else {
                 victim.status = 'injured';
                 this.addEvent(`${victim.name} queda herido (-${damage} HP).`);
@@ -470,10 +546,11 @@ Reglas obligatorias:
             return;
         }
 
-        const target = this.pickRandom(alivePlayers);
-        if (!target) return;
-        this.eliminatePlayer(target);
-        this.addEvent(`❌ ${target.name} ha sido eliminado en la ronda ${this.round}.`);
+        if (plan.type === 'elimination' && plan.victim) {
+            const target = plan.victim;
+            this.eliminatePlayer(target);
+            this.addEvent(`❌ ${target.name} ha sido eliminado en la ronda ${this.round}.`);
+        }
     }
 
     eliminatePlayer(player) {
@@ -483,15 +560,26 @@ Reglas obligatorias:
         player.state = 'Sin vida.';
     }
 
-    generateFallbackEvent() {
-        const fallbackEvents = [
-            'Una tormenta eléctrica recorre la arena, alterando la visibilidad.',
-            'Se activa un enjambre de drones defectuosos que disparan bengalas sin control.',
-            'Una zona del terreno comienza a hundirse lentamente creando pánico.',
-            'Un rumor sobre un suministro legendario provoca movimientos desesperados.',
-            'El sistema anuncia un cambio de reglas sorpresa y todos se tensionan.'
-        ];
-        return this.pickRandom(fallbackEvents);
+    generateFallbackEvent(plan) {
+        if (!plan) {
+            const generic = [
+                'Una tormenta eléctrica recorre la arena, alterando la visibilidad.',
+                'Se activa un enjambre de drones defectuosos que disparan bengalas sin control.',
+                'Una zona del terreno comienza a hundirse lentamente creando pánico.',
+                'Un rumor sobre un suministro legendario provoca movimientos desesperados.',
+                'El sistema anuncia un cambio de reglas sorpresa y todos se tensionan.'
+            ];
+            return this.pickRandom(generic);
+        }
+
+        const names = (plan.participants ?? []).map(player => player.name).join(', ');
+        if (plan.type === 'injury' && plan.victim) {
+            return `Un fallo en la arena hiere a ${plan.victim.name}; pierde ${plan.damage} HP y queda ${plan.newState}.`;
+        }
+        if (plan.type === 'elimination' && plan.victim) {
+            return `Un giro inesperado deja fuera de combate a ${plan.victim.name} durante la refriega.`;
+        }
+        return `Los participantes ${names || 'de la zona'} se encuentran, pero la situación se resuelve sin heridas.`;
     }
 
     addEvent(text, isLoading = false) {
