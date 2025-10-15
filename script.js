@@ -428,8 +428,24 @@ Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos p
 
     safeParseEventPayload(rawText) {
         if (!rawText) return null;
+
+        let cleaned = rawText.trim();
+
+        // Si la respuesta viene dentro de un bloque de código Markdown, extraemos su contenido.
+        const fencedMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+        if (fencedMatch && fencedMatch[1]) {
+            cleaned = fencedMatch[1].trim();
+        }
+
+        // Como refuerzo, tomamos sólo la porción comprendida entre el primer "{" y el último "}".
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            cleaned = cleaned.slice(firstBrace, lastBrace + 1).trim();
+        }
+
         try {
-            const parsed = JSON.parse(rawText);
+            const parsed = JSON.parse(cleaned);
             if (!parsed || typeof parsed !== 'object') return null;
             return parsed;
         } catch (error) {
