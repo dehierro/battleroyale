@@ -344,7 +344,6 @@ class BattleRoyaleSimulator {
             .map(player => `${player.name}: ${player.bio}`)
             .join('\n');
 
-        const participants = this.selectParticipantsForEvent(availablePlayers);
         const trimmedContext = typeof this.globalContext === 'string' ? this.globalContext.trim() : '';
         const arenaContext = trimmedContext
             ? `\nContexto general del escenario:\n${trimmedContext}\n`
@@ -352,7 +351,7 @@ class BattleRoyaleSimulator {
 
         const participants = Array.isArray(plan?.participants) && plan.participants.length
             ? plan.participants
-            : alivePlayers.slice(0, Math.min(3, alivePlayers.length));
+            : this.selectParticipantsForEvent(alivePlayers);
 
         const participantsSummary = participants
             .map(player => {
