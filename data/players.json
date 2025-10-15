@@ -1,0 +1,236 @@
+[
+  {
+    "name": "Alex \"Halcón\" Ortega",
+    "bio": "Ex francotirador militar que huyó tras revelar corrupción. Confía en su mira y en su código moral propio.",
+    "image": "images/players/alex-halcon-ortega.svg",
+    "hp": 100,
+    "maxHp": 100,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Bianca \"Volt\" Salvatierra",
+    "bio": "Ingeniera eléctrica que fabrica trampas improvisadas con cualquier cosa. Ama los desafíos imposibles.",
+    "image": "images/players/bianca-volt-salvatierra.svg",
+    "hp": 95,
+    "maxHp": 95,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Carlos \"Furia\" Montalvo",
+    "bio": "Ex luchador clandestino con reputación de invencible. Busca redención tras una pelea que salió mal.",
+    "image": "images/players/carlos-furia-montalvo.svg",
+    "hp": 115,
+    "maxHp": 115,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Daria \"Silente\" Novak",
+    "bio": "Espía retirada especializada en infiltración. Prefiere actuar desde las sombras y observar antes de atacar.",
+    "image": "images/players/daria-silente-novak.svg",
+    "hp": 90,
+    "maxHp": 90,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Elias \"Trémolo\" Ruiz",
+    "bio": "Músico callejero que oculta cuchillas en su guitarra. Usa el ritmo para anticipar los movimientos rivales.",
+    "image": "images/players/elias-tremolo-ruiz.svg",
+    "hp": 100,
+    "maxHp": 100,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Farah \"Sombra\" Haddad",
+    "bio": "Ladrona profesional que domina la evasión. Conoce todos los escondites y rutas alternativas.",
+    "image": "images/players/farah-sombra-haddad.svg",
+    "hp": 92,
+    "maxHp": 92,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Gael \"Runo\" Ibarra",
+    "bio": "Programador que convirtió drones agrícolas en centinelas personales. Observa el terreno desde el aire.",
+    "image": "images/players/gael-runo-ibarra.svg",
+    "hp": 88,
+    "maxHp": 88,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Helena \"Valkiria\" Torres",
+    "bio": "Bombera que sobrevivió a incendios masivos. Conoce el comportamiento del fuego mejor que nadie.",
+    "image": "images/players/helena-valkiria-torres.svg",
+    "hp": 110,
+    "maxHp": 110,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Iñaki \"Eco\" Larrea",
+    "bio": "Guía de montaña y paramédico. Tiene habilidades de supervivencia y una ética protectora arraigada.",
+    "image": "images/players/inaki-eco-larrea.svg",
+    "hp": 105,
+    "maxHp": 105,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Jimena \"Ráfaga\" Galván",
+    "bio": "Piloto de rally que ama la velocidad extrema. Sus maniobras sorprenden a cualquiera.",
+    "image": "images/players/jimena-rafaga-galvan.svg",
+    "hp": 100,
+    "maxHp": 100,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Koji \"Niebla\" Tanaka",
+    "bio": "Botánico experto en toxinas y antídotos. Lleva un herbario portátil con sorpresas.",
+    "image": "images/players/koji-niebla-tanaka.svg",
+    "hp": 96,
+    "maxHp": 96,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Luna \"Hex\" Fernández",
+    "bio": "Streamer de juegos de terror que disfruta planear trampas psicológicas para su audiencia.",
+    "image": "images/players/luna-hex-fernandez.svg",
+    "hp": 94,
+    "maxHp": 94,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Matías \"Ancla\" Roldán",
+    "bio": "Pescador de aguas profundas con fuerza descomunal y paciencia infinita.",
+    "image": "images/players/matias-ancla-roldan.svg",
+    "hp": 120,
+    "maxHp": 120,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Nadia \"Pulse\" Karim",
+    "bio": "Doctora de urgencias que improvisa quirófanos con recursos mínimos. Nunca abandona a un aliado.",
+    "image": "images/players/nadia-pulse-karim.svg",
+    "hp": 102,
+    "maxHp": 102,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Octavio \"Mirlo\" Solís",
+    "bio": "Cartógrafo que dibuja el terreno en segundos. Lee el paisaje como si fuera música.",
+    "image": "images/players/octavio-mirlo-solis.svg",
+    "hp": 98,
+    "maxHp": 98,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Paula \"Fénix\" Rivero",
+    "bio": "Sobreviviente de un desastre natural. Transformó la adversidad en resiliencia inquebrantable.",
+    "image": "images/players/paula-fenix-rivero.svg",
+    "hp": 108,
+    "maxHp": 108,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Quintín \"Ajedrez\" Paredes",
+    "bio": "Gran maestro de ajedrez obsesionado con la estrategia. Cada combate es una partida perfecta.",
+    "image": "images/players/quintin-ajedrez-paredes.svg",
+    "hp": 90,
+    "maxHp": 90,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Renata \"Puma\" Andrade",
+    "bio": "Atleta de parkour con reflejos felinos. Domina el terreno urbano y natural por igual.",
+    "image": "images/players/renata-puma-andrade.svg",
+    "hp": 99,
+    "maxHp": 99,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Said \"Oráculo\" Rahman",
+    "bio": "Psicólogo criminal que predice decisiones bajo presión. Entiende el miedo mejor que nadie.",
+    "image": "images/players/said-oraculo-rahman.svg",
+    "hp": 97,
+    "maxHp": 97,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Tamara \"Relámpago\" Küster",
+    "bio": "Esgrimista olímpica que persigue la perfección en cada golpe. Ambiciosa hasta la médula.",
+    "image": "images/players/tamara-relampago-kuster.svg",
+    "hp": 101,
+    "maxHp": 101,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Ulises \"Crux\" Mendoza",
+    "bio": "Ex sacerdote convertido en estratega táctico. Mezcla calma espiritual con disciplina militar.",
+    "image": "images/players/ulises-crux-mendoza.svg",
+    "hp": 104,
+    "maxHp": 104,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Vera \"Tempestad\" Kuznetsova",
+    "bio": "Meteoróloga que predice tormentas al detalle. Usa el clima como arma.",
+    "image": "images/players/vera-tempestad-kuznetsova.svg",
+    "hp": 93,
+    "maxHp": 93,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Wendy \"Aurora\" Campos",
+    "bio": "Ilusionista que manipula la percepción con trucos de luces. Su espectáculo ahora es mortal.",
+    "image": "images/players/wendy-aurora-campos.svg",
+    "hp": 92,
+    "maxHp": 92,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Ximena \"Torque\" Vidal",
+    "bio": "Mecánica especializada en vehículos pesados. Puede convertir chatarra en un monstruo rodante.",
+    "image": "images/players/ximena-torque-vidal.svg",
+    "hp": 107,
+    "maxHp": 107,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Yago \"Astilla\" Moret",
+    "bio": "Carpintero de supervivencia que fabrica herramientas en minutos. Cree que la madera habla.",
+    "image": "images/players/yago-astilla-moret.svg",
+    "hp": 99,
+    "maxHp": 99,
+    "injuries": [],
+    "state": ""
+  },
+  {
+    "name": "Zara \"Bruma\" Delgado",
+    "bio": "Contrabandista que domina rutas clandestinas y contactos en cada puerto.",
+    "image": "images/players/zara-bruma-delgado.svg",
+    "hp": 100,
+    "maxHp": 100,
+    "injuries": [],
+    "state": ""
+  }
+]
