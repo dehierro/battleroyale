@@ -318,6 +318,16 @@ button.danger {
     margin: 0 auto;
 }
 
+.player-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    text-align: center;
+    line-height: 1.3;
+    word-break: break-word;
+    margin-top: 4px;
+}
+
 .modal-avatar {
     width: min(100%, 320px);
     height: auto;

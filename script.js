@@ -1,4 +1,4 @@
-const PLAYERS_DATA_URL = 'data/players.json';
+const PLAYERS_DATA_URL = new URL('./data/players.json', import.meta.url);
 
 const FALLBACK_PLAYERS = Array.from({ length: 24 }, (_, index) => ({
     name: `Combatiente ${index + 1}`,
@@ -134,13 +134,13 @@ class BattleRoyaleSimulator {
     async loadPlayersFromFile() {
         this.playersLoaded = false;
         try {
-            const response = await fetch(PLAYERS_DATA_URL);
+            const response = await fetch(PLAYERS_DATA_URL, { cache: 'no-store' });
             if (!response.ok) {
                 throw new Error(`Estado ${response.status}`);
             }
             const parsed = await response.json();
-            if (!Array.isArray(parsed) || parsed.length !== 24) {
-                throw new Error('El archivo debe contener un arreglo con 24 jugadores.');
+            if (!Array.isArray(parsed) || parsed.length < 1) {
+                throw new Error('El archivo debe contener al menos un jugador.');
             }
             this.players = parsed.map((player, index) => this.normalizePlayer(player, index));
             this.playersLoaded = true;
@@ -181,7 +181,11 @@ class BattleRoyaleSimulator {
         this.round = 0;
         this.events = [];
         this.updateDisplay();
-        this.addEvent('La arena se activa. 24 combatientes entran en juego.');
+        const aliveCount = this.players.filter(player => player.status !== 'dead').length;
+        const rosterMessage = aliveCount === 1
+            ? 'La arena se activa. Solo queda un combatiente en juego.'
+            : `La arena se activa. ${aliveCount} combatientes entran en juego.`;
+        this.addEvent(rosterMessage);
         document.getElementById('startGame').disabled = true;
         this.apiKeyInput.disabled = true;
         this.updateNextEventButton();
@@ -439,6 +443,7 @@ Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores 
             const hpLevelClass = hpPercent <= 25 ? 'critical' : hpPercent <= 60 ? 'warning' : 'healthy';
             card.innerHTML = `
                 <img class="player-avatar" src="${player.image}" alt="Avatar de ${player.name}" loading="lazy" />
+                <h3 class="player-name" title="${player.name}">${player.name}</h3>
                 <div class="player-quick-info">
                     <div class="player-hp-block">
                         <div class="player-hp-header">
@@ -508,8 +513,8 @@ Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores 
     updatePlayersFromConfig() {
         try {
             const parsed = JSON.parse(this.playersConfigInput.value);
-            if (!Array.isArray(parsed) || parsed.length !== 24) {
-                throw new Error('Debe proporcionar exactamente 24 jugadores.');
+            if (!Array.isArray(parsed) || parsed.length < 1) {
+                throw new Error('Debes proporcionar al menos un jugador.');
             }
             this.players = parsed.map((entry, index) => this.normalizePlayer(entry, index));
             this.playersLoaded = true;
