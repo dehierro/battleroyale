@@ -228,10 +228,13 @@ class BattleRoyaleSimulator {
         this.addEvent(`⏳ Generando evento de la ronda ${this.round}...`, true);
 
         try {
-            const eventDescription = await this.generateEvent();
+            const eventPayload = await this.generateEvent();
             this.removeLoadingEvents();
-            this.addEvent(eventDescription);
-            this.applyRandomOutcome();
+            if (eventPayload?.eventText) {
+                this.addEvent(eventPayload.eventText);
+            }
+            const outcomeLogs = this.applyEventOutcome(eventPayload?.eventOutcome);
+            outcomeLogs.forEach(log => this.addEvent(log));
         } catch (error) {
             console.error(error);
             this.removeLoadingEvents();
@@ -249,39 +252,49 @@ class BattleRoyaleSimulator {
     }
 
     async generateEvent() {
-        const alivePlayers = this.players.filter(player => player.status === 'alive');
-        const injuredPlayers = this.players.filter(player => player.status === 'injured');
+        const availablePlayers = this.players.filter(player => player.status !== 'dead');
+        if (!availablePlayers.length) {
+            throw new Error('No hay jugadores disponibles para generar un evento.');
+        }
 
-        const rosterSummary = alivePlayers
-            .map(player => {
-                const state = player.state ? player.state : 'sin novedades';
-                const injuries = player.injuries.length ? player.injuries.join(', ') : 'ninguna';
-                return `${player.name} (${player.hp} HP, lesiones: ${injuries}, estado: ${state})`;
-            })
-            .join('\n');
-
-        const bioContext = alivePlayers
-            .slice(0, 10)
-            .map(player => `${player.name}: ${player.bio}`)
-            .join('\n');
-
+        const participants = this.selectParticipantsForEvent(availablePlayers);
         const trimmedContext = typeof this.globalContext === 'string' ? this.globalContext.trim() : '';
-        const arenaContext = trimmedContext
-            ? `\nContexto general del escenario:\n${trimmedContext}\n`
-            : '';
+        const contextText = trimmedContext || 'Sin contexto adicional proporcionado por el usuario.';
+        const participantBlocks = participants.map(player => {
+            const injuries = player.injuries.length ? player.injuries.join(', ') : 'ninguna';
+            const state = player.state ? player.state : 'sin novedades';
+            return `ID ${player.id} - ${player.name}\nEstado: ${player.status}\nHP: ${player.hp}/${player.maxHp}\nLesiones: ${injuries}\nEstado mental/físico: ${state}\nBiografía: ${player.bio}`;
+        }).join('\n\n');
 
-        const prompt = `Estamos en un simulador de battle royale en español. Describe un único evento para la ronda ${this.round}.
-Datos del estado actual:
-- ${alivePlayers.length} jugadores vivos.
-- ${injuredPlayers.length} con lesiones.
+        const prompt = `Simulador de battle royale en español. Ronda ${this.round}.
+Contexto general: ${contextText}
 
-Lista breve de jugadores:
-${rosterSummary}
+Participantes involucrados en este evento:
+${participantBlocks}
 
-Contexto biográfico:
-${bioContext}${arenaContext}
-
-Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores al azar. La escena puede ser narrativa, un conflicto, un hallazgo o un peligro ambiental. Menciona consecuencias potenciales sin decidir por completo el resultado (para mantener suspenso).`;
+Genera un evento breve en español (máximo 120 palabras) que solo involucre a los participantes listados. Mantén coherencia con sus estados actuales.
+Debes responder ÚNICAMENTE con un objeto JSON válido que siga exactamente esta estructura y orden de campos:
+{
+  "eventText": "Texto narrativo del evento en español",
+  "eventOutcome": {
+    "summary": "Resumen breve de las consecuencias",
+    "effects": [
+      {
+        "participantId": <ID numérico>,
+        "status": "alive" | "injured" | "dead",
+        "hpDelta": <número entero (negativo si pierde HP, positivo si gana HP, 0 si se mantiene)>,
+        "injuries": ["lista opcional de lesiones nuevas o agravadas"],
+        "state": "Descripción breve del estado mental o físico tras el evento"
+      }
+    ]
+  }
+}
+Reglas obligatorias:
+- Incluye exactamente un objeto de efecto por cada participante listado, sin añadir otros personajes.
+- Usa los IDs proporcionados.
+- Si un participante muere, su estado debe ser "dead" y el hpDelta reflejar el daño recibido.
+- Si no hay cambios para un participante, usa hpDelta 0, mantén su estado actual y deja injuries como un arreglo vacío.
+- El resumen debe ser coherente con los efectos listados.`;
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -294,7 +307,7 @@ Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores 
                 messages: [
                     {
                         role: 'system',
-                        content: 'Eres un narrador épico de un battle royale apto para todo público. Usa un tono emocionante y claro.'
+                        content: 'Eres un narrador épico de un battle royale apto para todo público. Usa un tono emocionante y claro y sigue estrictamente las instrucciones de formato JSON.'
                     },
                     {
                         role: 'user',
@@ -315,7 +328,101 @@ Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores 
         if (!message) {
             throw new Error('Respuesta incompleta de la API');
         }
-        return message.trim();
+        const trimmed = message.trim();
+        const parsed = this.safeParseEventPayload(trimmed);
+        if (!parsed) {
+            throw new Error('La respuesta del modelo no es un JSON válido.');
+        }
+        return parsed;
+    }
+
+    safeParseEventPayload(rawText) {
+        if (!rawText) return null;
+        try {
+            const parsed = JSON.parse(rawText);
+            if (!parsed || typeof parsed !== 'object') return null;
+            return parsed;
+        } catch (error) {
+            console.error('No se pudo analizar el JSON del evento:', error, rawText);
+            return null;
+        }
+    }
+
+    selectParticipantsForEvent(players) {
+        const pool = players.slice();
+        const maxCount = Math.min(3, pool.length);
+        const count = Math.max(1, Math.floor(Math.random() * maxCount) + 1);
+        const selected = [];
+        while (selected.length < count && pool.length) {
+            const index = Math.floor(Math.random() * pool.length);
+            selected.push(pool.splice(index, 1)[0]);
+        }
+        return selected;
+    }
+
+    applyEventOutcome(eventOutcome) {
+        if (!eventOutcome || typeof eventOutcome !== 'object') {
+            return [];
+        }
+
+        const logs = [];
+        const { summary, effects } = eventOutcome;
+        if (Array.isArray(effects)) {
+            effects.forEach(effect => {
+                const playerId = Number(effect?.participantId);
+                if (!Number.isFinite(playerId)) return;
+                const player = this.players.find(candidate => candidate.id === playerId);
+                if (!player) return;
+
+                const hpDelta = Number.isFinite(effect?.hpDelta) ? Math.round(effect.hpDelta) : 0;
+                if (hpDelta !== 0) {
+                    const targetHp = Math.max(0, Math.min(player.maxHp, player.hp + hpDelta));
+                    player.hp = targetHp;
+                }
+
+                if (Array.isArray(effect?.injuries)) {
+                    effect.injuries
+                        .map(injury => typeof injury === 'string' ? injury.trim() : '')
+                        .filter(Boolean)
+                        .forEach(injury => {
+                            if (!player.injuries.includes(injury)) {
+                                player.injuries.push(injury);
+                            }
+                        });
+                }
+
+                if (typeof effect?.state === 'string') {
+                    const trimmedState = effect.state.trim();
+                    if (trimmedState) {
+                        player.state = trimmedState;
+                    }
+                }
+
+                const status = typeof effect?.status === 'string' ? effect.status.trim().toLowerCase() : '';
+                if (status === 'dead') {
+                    this.eliminatePlayer(player);
+                    logs.push(`❌ ${player.name} cae en combate tras el evento.`);
+                    return;
+                }
+                if (status === 'injured') {
+                    player.status = 'injured';
+                    logs.push(`${player.name} queda herido (${player.hp}/${player.maxHp} HP).`);
+                } else if (status === 'alive') {
+                    player.status = 'alive';
+                    if (hpDelta < 0) {
+                        logs.push(`${player.name} resiste el golpe y mantiene la pelea (${player.hp}/${player.maxHp} HP).`);
+                    } else if (hpDelta > 0) {
+                        logs.push(`${player.name} se recupera un poco (${player.hp}/${player.maxHp} HP).`);
+                    }
+                }
+            });
+        }
+
+        if (typeof summary === 'string' && summary.trim()) {
+            logs.unshift(summary.trim());
+        }
+
+        return logs;
     }
 
     applyRandomOutcome() {
