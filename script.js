@@ -222,22 +222,24 @@ class BattleRoyaleSimulator {
             return;
         }
 
+        const plan = this.planEventOutcome(alivePlayers);
+
         this.isProcessingEvent = true;
         this.round += 1;
         this.updateNextEventButton();
         this.addEvent(`⏳ Generando evento de la ronda ${this.round}...`, true);
 
         try {
-            const eventDescription = await this.generateEvent();
+            const eventDescription = await this.generateEvent(plan);
             this.removeLoadingEvents();
             this.addEvent(eventDescription);
-            this.applyRandomOutcome();
+            this.applyPlannedOutcome(plan);
         } catch (error) {
             console.error(error);
             this.removeLoadingEvents();
-            const fallback = this.generateFallbackEvent();
+            const fallback = this.generateFallbackEvent(plan);
             this.addEvent(`⚠️ Error con la API (${error.message}). Evento alternativo: ${fallback}`);
-            this.applyRandomOutcome();
+            this.applyPlannedOutcome(plan);
         }
 
         this.updateDisplay();
@@ -248,7 +250,84 @@ class BattleRoyaleSimulator {
         }
     }
 
-    async generateEvent() {
+    planEventOutcome(alivePlayers) {
+        if (!alivePlayers.length) {
+            return { type: 'narrative', participants: [] };
+        }
+
+        const roll = Math.random();
+        const maxParticipants = Math.min(3, alivePlayers.length);
+
+        const pickGroup = (mandatory = []) => {
+            const desired = Math.max(1, Math.floor(Math.random() * maxParticipants) + 1);
+            const participants = [...mandatory];
+            const pool = alivePlayers.filter(player => !participants.includes(player));
+            while (participants.length < desired && pool.length) {
+                const index = Math.floor(Math.random() * pool.length);
+                participants.push(pool.splice(index, 1)[0]);
+            }
+            return participants;
+        };
+
+        if (roll < 0.4) {
+            return {
+                type: 'narrative',
+                participants: pickGroup()
+            };
+        }
+
+        const victim = this.pickRandom(alivePlayers);
+        if (!victim) {
+            return {
+                type: 'narrative',
+                participants: pickGroup()
+            };
+        }
+
+        const participants = pickGroup([victim]);
+
+        if (roll < 0.75) {
+            const injuryOptions = [
+                'contusión en el hombro',
+                'corte profundo en el brazo',
+                'esguince de tobillo',
+                'quemadura leve',
+                'costillas magulladas',
+                'mareos persistentes'
+            ];
+            const stateOptions = [
+                'Pierna lesionada',
+                'Conmoción leve',
+                'Aturdido por la explosión',
+                'Infección incipiente',
+                'Pánico momentáneo'
+            ];
+            const baseDamage = 10 + Math.floor(Math.random() * 16);
+            if (victim.hp - baseDamage <= 0) {
+                return {
+                    type: 'elimination',
+                    participants,
+                    victim
+                };
+            }
+            return {
+                type: 'injury',
+                participants,
+                victim,
+                damage: Math.max(1, Math.min(baseDamage, victim.hp - 1)),
+                injury: this.pickRandom(injuryOptions),
+                newState: this.pickRandom(stateOptions) || 'Malherido'
+            };
+        }
+
+        return {
+            type: 'elimination',
+            participants,
+            victim
+        };
+    }
+
+    async generateEvent(plan) {
         const alivePlayers = this.players.filter(player => player.status === 'alive');
         const injuredPlayers = this.players.filter(player => player.status === 'injured');
 
@@ -270,7 +349,28 @@ class BattleRoyaleSimulator {
             ? `\nContexto general del escenario:\n${trimmedContext}\n`
             : '';
 
-        const prompt = `Estamos en un simulador de battle royale en español. Describe un único evento para la ronda ${this.round}.
+        const participants = Array.isArray(plan?.participants) && plan.participants.length
+            ? plan.participants
+            : alivePlayers.slice(0, Math.min(3, alivePlayers.length));
+
+        const participantsSummary = participants
+            .map(player => {
+                const state = player.state ? player.state : 'sin novedades';
+                const injuries = player.injuries.length ? player.injuries.join(', ') : 'ninguna';
+                return `${player.name} (${player.hp} HP, lesiones: ${injuries}, estado: ${state})`;
+            })
+            .join('\n');
+
+        const participantsNames = participants.map(player => player.name).join(', ');
+
+        let consequenceGuidance = 'Concluye el suceso aclarando que nadie resulta herido ni eliminado.';
+        if (plan?.type === 'injury' && plan?.victim) {
+            consequenceGuidance = `Describe cómo ${plan.victim.name} resulta herido en la escena y pierde ${plan.damage} puntos de vida. Menciona una lesión compatible (${plan.injury}) y deja constancia de que queda ${plan.newState}.`;
+        } else if (plan?.type === 'elimination' && plan?.victim) {
+            consequenceGuidance = `Narra de forma explícita cómo ${plan.victim.name} queda fuera de combate en esta misma escena.`;
+        }
+
+        const prompt = `Estamos en un simulador de battle royale en español. Describe un único evento autoconclusivo para la ronda ${this.round}.
 Datos del estado actual:
 - ${alivePlayers.length} jugadores vivos.
 - ${injuredPlayers.length} con lesiones.
@@ -281,7 +381,10 @@ ${rosterSummary}
 Contexto biográfico:
 ${bioContext}${arenaContext}
 
-Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores al azar. La escena puede ser narrativa, un conflicto, un hallazgo o un peligro ambiental. Menciona consecuencias potenciales sin decidir por completo el resultado (para mantener suspenso).`;
+Personajes implicados obligatorios:
+${participantsSummary}
+
+Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos personajes. El evento debe ser autoconclusivo: cierra la acción en la misma escena, sin cliffhangers ni promesas sobre eventos futuros. ${consequenceGuidance} No incluyas a ningún otro personaje ajeno a la lista (${participantsNames}).`;
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -318,44 +421,29 @@ Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores 
         return message.trim();
     }
 
-    applyRandomOutcome() {
-        const alivePlayers = this.players.filter(player => player.status === 'alive');
-        if (!alivePlayers.length) return;
-
-        const outcomeRoll = Math.random();
-        if (outcomeRoll < 0.4) {
-            // Evento narrativo sin daños.
-            this.addEvent('Nadie sufre consecuencias directas en esta ronda. La tensión crece.');
+    applyPlannedOutcome(plan) {
+        if (!plan) {
+            this.addEvent('No se pudo determinar el resultado del evento.');
             return;
         }
 
-        if (outcomeRoll < 0.75) {
-            const victim = this.pickRandom(alivePlayers);
-            if (!victim) return;
-            const damage = 10 + Math.floor(Math.random() * 16); // 10-25
+        if (plan.type === 'narrative' || !plan.participants?.length) {
+            return;
+        }
+
+        if (plan.type === 'injury' && plan.victim) {
+            const victim = plan.victim;
+            const damage = Math.max(1, Math.min(plan.damage ?? 10, victim.hp));
             victim.hp = Math.max(victim.hp - damage, 0);
-            const injuryOptions = [
-                'contusión en el hombro',
-                'corte profundo en el brazo',
-                'esguince de tobillo',
-                'quemadura leve',
-                'costillas magulladas',
-                'mareos persistentes'
-            ];
-            const newInjury = this.pickRandom(injuryOptions);
-            if (!victim.injuries.includes(newInjury)) {
-                victim.injuries.push(newInjury);
+            if (plan.injury && !victim.injuries.includes(plan.injury)) {
+                victim.injuries.push(plan.injury);
             }
-            victim.state = this.pickRandom([
-                'Pierna rota',
-                'Conmoción leve',
-                'Aturdido por explosión',
-                'Infección incipiente',
-                'Pánico momentáneo'
-            ]);
+            if (plan.newState) {
+                victim.state = plan.newState;
+            }
             if (victim.hp <= 0) {
                 this.eliminatePlayer(victim);
-                this.addEvent(`${victim.name} sucumbe a sus heridas y queda fuera del juego.`);
+                this.addEvent(`${victim.name} no resiste las heridas y queda eliminado.`);
             } else {
                 victim.status = 'injured';
                 this.addEvent(`${victim.name} queda herido (-${damage} HP).`);
@@ -363,10 +451,11 @@ Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores 
             return;
         }
 
-        const target = this.pickRandom(alivePlayers);
-        if (!target) return;
-        this.eliminatePlayer(target);
-        this.addEvent(`❌ ${target.name} ha sido eliminado en la ronda ${this.round}.`);
+        if (plan.type === 'elimination' && plan.victim) {
+            const target = plan.victim;
+            this.eliminatePlayer(target);
+            this.addEvent(`❌ ${target.name} ha sido eliminado en la ronda ${this.round}.`);
+        }
     }
 
     eliminatePlayer(player) {
@@ -376,15 +465,26 @@ Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores 
         player.state = 'Sin vida.';
     }
 
-    generateFallbackEvent() {
-        const fallbackEvents = [
-            'Una tormenta eléctrica recorre la arena, alterando la visibilidad.',
-            'Se activa un enjambre de drones defectuosos que disparan bengalas sin control.',
-            'Una zona del terreno comienza a hundirse lentamente creando pánico.',
-            'Un rumor sobre un suministro legendario provoca movimientos desesperados.',
-            'El sistema anuncia un cambio de reglas sorpresa y todos se tensionan.'
-        ];
-        return this.pickRandom(fallbackEvents);
+    generateFallbackEvent(plan) {
+        if (!plan) {
+            const generic = [
+                'Una tormenta eléctrica recorre la arena, alterando la visibilidad.',
+                'Se activa un enjambre de drones defectuosos que disparan bengalas sin control.',
+                'Una zona del terreno comienza a hundirse lentamente creando pánico.',
+                'Un rumor sobre un suministro legendario provoca movimientos desesperados.',
+                'El sistema anuncia un cambio de reglas sorpresa y todos se tensionan.'
+            ];
+            return this.pickRandom(generic);
+        }
+
+        const names = (plan.participants ?? []).map(player => player.name).join(', ');
+        if (plan.type === 'injury' && plan.victim) {
+            return `Un fallo en la arena hiere a ${plan.victim.name}; pierde ${plan.damage} HP y queda ${plan.newState}.`;
+        }
+        if (plan.type === 'elimination' && plan.victim) {
+            return `Un giro inesperado deja fuera de combate a ${plan.victim.name} durante la refriega.`;
+        }
+        return `Los participantes ${names || 'de la zona'} se encuentran, pero la situación se resuelve sin heridas.`;
     }
 
     addEvent(text, isLoading = false) {
