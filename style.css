@@ -46,6 +46,19 @@ body {
     gap: 24px;
 }
 
+.header-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: stretch;
+}
+
+.header-top .title-block {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .title-block h1 {
     font-size: clamp(2rem, 4vw, 2.8rem);
     font-weight: 700;
@@ -63,13 +76,24 @@ body {
     display: grid;
     gap: 16px;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    align-items: center;
+    align-items: start;
 }
 
 .api-key-group {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.context-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.context-group label {
+    font-weight: 600;
+    color: rgba(15, 23, 42, 0.8);
 }
 
 .api-key-group label {
@@ -93,10 +117,31 @@ textarea {
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
+#gameContext {
+    min-height: 120px;
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.5;
+}
+
+.context-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
 .control-buttons {
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+}
+
+@media (max-width: 900px) {
+    .header-top {
+        grid-template-columns: 1fr;
+    }
+
+    .context-group {
+        order: 1;
+    }
 }
 
 button {

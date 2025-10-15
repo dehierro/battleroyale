@@ -19,6 +19,7 @@ class BattleRoyaleSimulator {
         this.isProcessingEvent = false;
         this.events = [];
         this.playersLoaded = false;
+        this.globalContext = '';
 
         this.cacheDom();
         this.registerEventListeners();
@@ -38,6 +39,7 @@ class BattleRoyaleSimulator {
         this.playersInjuredEl = document.getElementById('playersInjured');
         this.playersDeadEl = document.getElementById('playersDead');
         this.apiKeyInput = document.getElementById('apiKey');
+        this.contextInput = document.getElementById('gameContext');
         this.configModal = document.getElementById('configModal');
         this.playerModal = document.getElementById('playerModal');
         this.playersConfigInput = document.getElementById('playersConfig');
@@ -72,6 +74,12 @@ class BattleRoyaleSimulator {
                 this.hideModal(this.configModal);
             }
         });
+
+        if (this.contextInput) {
+            this.contextInput.addEventListener('input', () => {
+                this.globalContext = this.contextInput.value;
+            });
+        }
 
         this.updateNextEventButton();
     }
@@ -172,6 +180,7 @@ class BattleRoyaleSimulator {
             return;
         }
         this.apiKey = this.apiKeyInput.value.trim();
+        this.globalContext = this.contextInput ? this.contextInput.value : '';
         if (!this.apiKey) {
             alert('Introduce tu clave de API de OpenAI para comenzar la simulación.');
             return;
@@ -256,6 +265,11 @@ class BattleRoyaleSimulator {
             .map(player => `${player.name}: ${player.bio}`)
             .join('\n');
 
+        const trimmedContext = typeof this.globalContext === 'string' ? this.globalContext.trim() : '';
+        const arenaContext = trimmedContext
+            ? `\nContexto general del escenario:\n${trimmedContext}\n`
+            : '';
+
         const prompt = `Estamos en un simulador de battle royale en español. Describe un único evento para la ronda ${this.round}.
 Datos del estado actual:
 - ${alivePlayers.length} jugadores vivos.
@@ -265,7 +279,7 @@ Lista breve de jugadores:
 ${rosterSummary}
 
 Contexto biográfico:
-${bioContext}
+${bioContext}${arenaContext}
 
 Genera una escena breve (máximo 120 palabras) que involucre de 1 a 3 jugadores al azar. La escena puede ser narrativa, un conflicto, un hallazgo o un peligro ambiental. Menciona consecuencias potenciales sin decidir por completo el resultado (para mantener suspenso).`;
 

@@ -9,9 +9,16 @@
 <body>
     <div class="app-shell">
         <header class="app-header">
-            <div class="title-block">
-                <h1>Simulador Battle Royale</h1>
-                <p class="subtitle">Una narración automática de supervivencia extrema impulsada por IA.</p>
+            <div class="header-top">
+                <div class="title-block">
+                    <h1>Simulador Battle Royale</h1>
+                    <p class="subtitle">Una narración automática de supervivencia extrema impulsada por IA.</p>
+                </div>
+                <div class="context-group">
+                    <label for="gameContext">Contexto del escenario</label>
+                    <textarea id="gameContext" placeholder="Describe aquí el entorno general del battle royale..."></textarea>
+                    <p class="context-hint">Se añadirá a cada solicitud para mantener la coherencia narrativa.</p>
+                </div>
             </div>
             <div class="control-panel">
                 <div class="api-key-group">
