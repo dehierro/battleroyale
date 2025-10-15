@@ -1,40 +1,39 @@
-# Battle Royale Simulator
+# Simulador Battle Royale
 
-A web-based battle royale simulator that uses AI to generate dynamic events. Watch 24 players compete in randomly generated scenarios that can result in injuries, eliminations, or safe outcomes.
+Aplicación web de una simulación estilo battle royale que narra la partida de forma automática con ayuda de modelos de OpenAI. Veinticuatro combatientes completamente configurables avanzan ronda a ronda, sufren lesiones, experimentan cambios emocionales y pueden caer en el combate.
 
-## Features
+## Características principales
 
-- 24 unique players start each game
-- Dynamic event generation using OpenAI's GPT API
-- Real-time player status tracking (Alive, Injured, Dead)
-- Fallback events when API is unavailable
-- Responsive web design
-- Round-by-round progression
+- ✅ 24 personajes con nombre, avatar, puntos de vida, estado mental y biografía.
+- ✅ Generación automática de eventos narrativos por ronda usando la API de OpenAI (modelo `gpt-4o-mini`).
+- ✅ Sistema de turnos totalmente automático con control de velocidad y opción de pausa.
+- ✅ Editor JSON para personalizar rápidamente la lista completa de jugadores (nombre, imagen, HP, bio y estado).
+- ✅ Registro visual de eventos recientes y panel de estado para cada participante.
+- ✅ Eventos alternativos de respaldo cuando la llamada a la API falle.
 
-## How to Use
+## Cómo usarlo
 
-1. Open `index.html` in a web browser
-2. Enter your OpenAI API key (optional - fallback events will be used if no key is provided)
-3. Click "Start Game" to begin
-4. Click "Next Event" to progress through rounds
-5. Watch as events unfold and players are eliminated
+1. Abre `index.html` en un navegador moderno.
+2. Introduce tu clave de API de OpenAI en el campo correspondiente.
+3. (Opcional) Pulsa **Configurar jugadores** para editar la lista inicial de combatientes en formato JSON.
+4. Ajusta la velocidad de generación de eventos mediante el control deslizante.
+5. Pulsa **Comenzar simulación** y observa la narración automática.
+6. Puedes pausar/reanudar la simulación o reiniciarla en cualquier momento.
 
-## Setup
+> **Nota:** La aplicación necesita una clave válida de OpenAI para generar narrativas dinámicas. Si no se puede contactar con la API, el sistema mostrará eventos de respaldo y continuará la simulación.
 
-No build process required - simply open the HTML file in any modern web browser.
+## Desarrollo local
 
-For development with a local server:
+No es necesario un entorno de compilación. Para servir los archivos con un servidor local:
+
 ```bash
 python3 -m http.server 8000
 ```
-Then navigate to `http://localhost:8000`
 
-## API Integration
+Después visita `http://localhost:8000` en tu navegador.
 
-The simulator integrates with OpenAI's API to generate unique, contextual events. If no API key is provided or the API is unavailable, the system falls back to a set of predefined dramatic events.
+## Arquitectura de archivos
 
-## Files
-
-- `index.html` - Main application interface
-- `script.js` - Game logic and API integration
-- `style.css` - Responsive styling and themes
+- `index.html`: estructura de la interfaz.
+- `style.css`: estilos y diseño responsivo.
+- `script.js`: lógica de simulación, integración con OpenAI y controles de UI.

@@ -1,98 +1,126 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Battle Royale Simulator</title>
+    <title>Simulador Battle Royale</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Battle Royale Simulator</h1>
-            <div class="controls">
-                <input type="password" id="apiKey" placeholder="Enter OpenAI API Key" />
-                <button id="startGame">Start Game</button>
-                <button id="nextEvent" disabled>Next Event</button>
-                <button id="resetGame">Reset Game</button>
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="title-block">
+                <h1>Simulador Battle Royale</h1>
+                <p class="subtitle">Una narración automática de supervivencia extrema impulsada por IA.</p>
+            </div>
+            <div class="control-panel">
+                <div class="api-key-group">
+                    <label for="apiKey">OpenAI API Key</label>
+                    <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" />
+                </div>
+                <div class="control-buttons">
+                    <button id="configurePlayers" class="secondary">Configurar jugadores</button>
+                    <button id="startGame" class="primary">Comenzar simulación</button>
+                    <button id="pauseGame" disabled>Pausar</button>
+                    <button id="resetGame" class="danger">Reiniciar</button>
+                </div>
+                <div class="speed-control">
+                    <label for="eventDelay">Velocidad</label>
+                    <input type="range" id="eventDelay" min="3" max="15" step="1" value="8" />
+                    <span id="eventDelayLabel">8 s</span>
+                </div>
             </div>
         </header>
 
-        <main>
-            <div class="game-info">
-                <div class="stat">
-                    <span class="label">Round:</span>
-                    <span id="roundNumber">0</span>
+        <main class="main-layout">
+            <section class="game-overview">
+                <div class="stat-card">
+                    <span class="stat-label">Ronda actual</span>
+                    <span class="stat-value" id="roundNumber">0</span>
                 </div>
-                <div class="stat">
-                    <span class="label">Players Alive:</span>
-                    <span id="playersAlive">24</span>
+                <div class="stat-card">
+                    <span class="stat-label">Supervivientes</span>
+                    <span class="stat-value" id="playersAlive">24</span>
                 </div>
-                <div class="stat">
-                    <span class="label">Players Injured:</span>
-                    <span id="playersInjured">0</span>
+                <div class="stat-card">
+                    <span class="stat-label">Heridos</span>
+                    <span class="stat-value" id="playersInjured">0</span>
                 </div>
-            </div>
+                <div class="stat-card">
+                    <span class="stat-label">Muertes</span>
+                    <span class="stat-value" id="playersDead">0</span>
+                </div>
+            </section>
 
-            <div class="game-content">
-                <div class="events-section">
-                    <h2>Events</h2>
-                    <div id="eventsLog"></div>
+            <section class="timeline">
+                <div class="section-header">
+                    <h2>Relato de eventos</h2>
+                    <p class="section-subtitle">Cada turno se genera automáticamente usando el estado actual del juego y los antecedentes de los jugadores.</p>
                 </div>
+                <div id="eventsLog" class="events-log"></div>
+            </section>
 
-                <div class="players-section">
-                    <h2>Players</h2>
-                    <div id="playersList"></div>
+            <section class="players-panel">
+                <div class="section-header">
+                    <h2>Participantes</h2>
+                    <p class="section-subtitle">Haz clic en cualquier combatiente para revisar su estado.</p>
                 </div>
-            </div>
+                <div id="playersList" class="players-grid"></div>
+            </section>
         </main>
     </div>
 
-    <!-- Player Info Modal -->
-    <div id="playerModal" class="modal">
+    <div id="playerModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalPlayerName">
         <div class="modal-content">
-            <span class="close">&times;</span>
+            <button class="close" aria-label="Cerrar">&times;</button>
             <div class="player-info-header">
-                <h2 id="modalPlayerName"></h2>
-                <div class="player-avatar">👤</div>
+                <div class="player-info-main">
+                    <h2 id="modalPlayerName"></h2>
+                    <span id="modalPlayerStatus" class="status-badge">&nbsp;</span>
+                </div>
+                <img id="modalPlayerImage" class="modal-avatar" alt="Avatar del jugador" />
             </div>
             <div class="player-info-content">
                 <div class="player-description">
-                    <h3>Description</h3>
-                    <p id="modalPlayerDescription"></p>
+                    <h3>Biografía</h3>
+                    <p id="modalPlayerBio"></p>
                 </div>
                 <div class="player-stats">
-                    <h3>Stats</h3>
+                    <h3>Estado físico</h3>
                     <div class="stat-grid">
                         <div class="stat-item">
-                            <span class="stat-label">HP:</span>
+                            <span class="stat-label">HP</span>
                             <span class="stat-value" id="modalPlayerHP"></span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Strength:</span>
-                            <span class="stat-value" id="modalPlayerStrength"></span>
+                            <span class="stat-label">Lesiones</span>
+                            <span class="stat-value" id="modalPlayerInjuries"></span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-label">Agility:</span>
-                            <span class="stat-value" id="modalPlayerAgility"></span>
+                            <span class="stat-label">Estado mental</span>
+                            <span class="stat-value" id="modalPlayerMental"></span>
                         </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Intelligence:</span>
-                            <span class="stat-value" id="modalPlayerIntelligence"></span>
-                        </div>
-                    </div>
-                </div>
-                <div class="player-status-info">
-                    <h3>Current Status</h3>
-                    <div class="status-display">
-                        <span class="status-badge" id="modalPlayerStatus"></span>
-                        <span id="modalPlayerStatusDetails"></span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <div id="configModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="configTitle">
+        <div class="modal-content large">
+            <button class="close" aria-label="Cerrar">&times;</button>
+            <div class="config-header">
+                <h2 id="configTitle">Configurar jugadores</h2>
+                <p>Introduce 24 jugadores en formato JSON. Puedes incluir <code>name</code>, <code>image</code>, <code>hp</code>, <code>injuries</code>, <code>mentalState</code> y <code>bio</code>.</p>
+            </div>
+            <textarea id="playersConfig" spellcheck="false"></textarea>
+            <div class="config-actions">
+                <button id="loadPlayers" class="primary">Actualizar jugadores</button>
+                <span id="configError" role="alert"></span>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js" type="module"></script>
 </body>
 </html>
