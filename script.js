@@ -344,6 +344,7 @@ class BattleRoyaleSimulator {
             .map(player => `${player.name}: ${player.bio}`)
             .join('\n');
 
+        const participants = this.selectParticipantsForEvent(availablePlayers);
         const trimmedContext = typeof this.globalContext === 'string' ? this.globalContext.trim() : '';
         const arenaContext = trimmedContext
             ? `\nContexto general del escenario:\n${trimmedContext}\n`
@@ -397,7 +398,7 @@ Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos p
                 messages: [
                     {
                         role: 'system',
-                        content: 'Eres un narrador épico de un battle royale apto para todo público. Usa un tono emocionante y claro.'
+                        content: 'Eres un narrador épico de un battle royale apto para todo público. Usa un tono emocionante y claro y sigue estrictamente las instrucciones de formato JSON.'
                     },
                     {
                         role: 'user',
@@ -418,7 +419,101 @@ Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos p
         if (!message) {
             throw new Error('Respuesta incompleta de la API');
         }
-        return message.trim();
+        const trimmed = message.trim();
+        const parsed = this.safeParseEventPayload(trimmed);
+        if (!parsed) {
+            throw new Error('La respuesta del modelo no es un JSON válido.');
+        }
+        return parsed;
+    }
+
+    safeParseEventPayload(rawText) {
+        if (!rawText) return null;
+        try {
+            const parsed = JSON.parse(rawText);
+            if (!parsed || typeof parsed !== 'object') return null;
+            return parsed;
+        } catch (error) {
+            console.error('No se pudo analizar el JSON del evento:', error, rawText);
+            return null;
+        }
+    }
+
+    selectParticipantsForEvent(players) {
+        const pool = players.slice();
+        const maxCount = Math.min(3, pool.length);
+        const count = Math.max(1, Math.floor(Math.random() * maxCount) + 1);
+        const selected = [];
+        while (selected.length < count && pool.length) {
+            const index = Math.floor(Math.random() * pool.length);
+            selected.push(pool.splice(index, 1)[0]);
+        }
+        return selected;
+    }
+
+    applyEventOutcome(eventOutcome) {
+        if (!eventOutcome || typeof eventOutcome !== 'object') {
+            return [];
+        }
+
+        const logs = [];
+        const { summary, effects } = eventOutcome;
+        if (Array.isArray(effects)) {
+            effects.forEach(effect => {
+                const playerId = Number(effect?.participantId);
+                if (!Number.isFinite(playerId)) return;
+                const player = this.players.find(candidate => candidate.id === playerId);
+                if (!player) return;
+
+                const hpDelta = Number.isFinite(effect?.hpDelta) ? Math.round(effect.hpDelta) : 0;
+                if (hpDelta !== 0) {
+                    const targetHp = Math.max(0, Math.min(player.maxHp, player.hp + hpDelta));
+                    player.hp = targetHp;
+                }
+
+                if (Array.isArray(effect?.injuries)) {
+                    effect.injuries
+                        .map(injury => typeof injury === 'string' ? injury.trim() : '')
+                        .filter(Boolean)
+                        .forEach(injury => {
+                            if (!player.injuries.includes(injury)) {
+                                player.injuries.push(injury);
+                            }
+                        });
+                }
+
+                if (typeof effect?.state === 'string') {
+                    const trimmedState = effect.state.trim();
+                    if (trimmedState) {
+                        player.state = trimmedState;
+                    }
+                }
+
+                const status = typeof effect?.status === 'string' ? effect.status.trim().toLowerCase() : '';
+                if (status === 'dead') {
+                    this.eliminatePlayer(player);
+                    logs.push(`❌ ${player.name} cae en combate tras el evento.`);
+                    return;
+                }
+                if (status === 'injured') {
+                    player.status = 'injured';
+                    logs.push(`${player.name} queda herido (${player.hp}/${player.maxHp} HP).`);
+                } else if (status === 'alive') {
+                    player.status = 'alive';
+                    if (hpDelta < 0) {
+                        logs.push(`${player.name} resiste el golpe y mantiene la pelea (${player.hp}/${player.maxHp} HP).`);
+                    } else if (hpDelta > 0) {
+                        logs.push(`${player.name} se recupera un poco (${player.hp}/${player.maxHp} HP).`);
+                    }
+                }
+            });
+        }
+
+        if (typeof summary === 'string' && summary.trim()) {
+            logs.unshift(summary.trim());
+        }
+
+        return logs;
     }
 
     applyPlannedOutcome(plan) {
