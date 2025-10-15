@@ -429,29 +429,123 @@ Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos p
     safeParseEventPayload(rawText) {
         if (!rawText) return null;
 
-        let cleaned = rawText.trim();
-
-        // Si la respuesta viene dentro de un bloque de código Markdown, extraemos su contenido.
-        const fencedMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
-        if (fencedMatch && fencedMatch[1]) {
-            cleaned = fencedMatch[1].trim();
-        }
-
-        // Como refuerzo, tomamos sólo la porción comprendida entre el primer "{" y el último "}".
-        const firstBrace = cleaned.indexOf('{');
-        const lastBrace = cleaned.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            cleaned = cleaned.slice(firstBrace, lastBrace + 1).trim();
-        }
+        const cleaned = this.extractJsonPayload(rawText);
+        if (!cleaned) return null;
 
         try {
             const parsed = JSON.parse(cleaned);
             if (!parsed || typeof parsed !== 'object') return null;
             return parsed;
-        } catch (error) {
-            console.error('No se pudo analizar el JSON del evento:', error, rawText);
-            return null;
+        } catch (originalError) {
+            const repaired = this.repairJsonPayload(cleaned);
+            if (!repaired) {
+                console.error('No se pudo analizar el JSON del evento:', originalError, rawText);
+                return null;
+            }
+
+            try {
+                const parsed = JSON.parse(repaired);
+                if (!parsed || typeof parsed !== 'object') return null;
+                console.warn('Se reparó un JSON incompleto devuelto por el modelo.');
+                return parsed;
+            } catch (repairedError) {
+                console.error('No se pudo analizar el JSON del evento:', repairedError, rawText);
+                return null;
+            }
         }
+    }
+
+    extractJsonPayload(rawText) {
+        if (!rawText) return '';
+
+        let cleaned = rawText.trim();
+
+        const fencedMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+        if (fencedMatch && fencedMatch[1]) {
+            cleaned = fencedMatch[1].trim();
+        }
+
+        const firstStructural = cleaned.search(/[\[{]/);
+        const lastStructural = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+        if (firstStructural !== -1 && lastStructural !== -1 && lastStructural > firstStructural) {
+            cleaned = cleaned.slice(firstStructural, lastStructural + 1).trim();
+        }
+
+        return cleaned;
+    }
+
+    repairJsonPayload(payload) {
+        if (!payload) return '';
+
+        let repaired = payload.trim();
+
+        const lastClosing = Math.max(repaired.lastIndexOf('}'), repaired.lastIndexOf(']'));
+        if (lastClosing !== -1) {
+            repaired = repaired.slice(0, lastClosing + 1);
+        }
+
+        repaired = repaired.replace(/,\s*(?=[}\]])/g, '');
+
+        const stack = [];
+        let inString = false;
+        let escape = false;
+
+        for (let i = 0; i < repaired.length; i += 1) {
+            const char = repaired[i];
+            if (inString) {
+                if (escape) {
+                    escape = false;
+                    continue;
+                }
+
+                if (char === '\\') {
+                    escape = true;
+                    continue;
+                }
+
+                if (char === '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (char === '"') {
+                inString = true;
+                continue;
+            }
+
+            if (char === '{' || char === '[') {
+                stack.push(char);
+                continue;
+            }
+
+            if (char === '}' || char === ']') {
+                if (!stack.length) {
+                    repaired = repaired.slice(0, i) + repaired.slice(i + 1);
+                    i -= 1;
+                    continue;
+                }
+
+                const opener = stack.pop();
+                const expected = opener === '{' ? '}' : ']';
+                if (char !== expected) {
+                    repaired = `${repaired.slice(0, i)}${expected}${repaired.slice(i + 1)}`;
+                }
+            }
+        }
+
+        if (inString) {
+            repaired += '"';
+        }
+
+        while (stack.length) {
+            const opener = stack.pop();
+            repaired += opener === '{' ? '}' : ']';
+        }
+
+        repaired = repaired.replace(/,\s*(?=[}\]])/g, '');
+
+        return repaired.trim();
     }
 
     selectParticipantsForEvent(players) {
