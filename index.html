@@ -8,90 +8,94 @@
 </head>
 <body>
     <div class="app-shell">
-        <header class="app-header">
-            <div class="header-top">
-                <div class="title-block">
-                    <h1>Simulador Battle Royale</h1>
-                    <p class="subtitle">Una narración automática de supervivencia extrema impulsada por IA.</p>
-                </div>
-                <div class="context-group">
-                    <label for="gameContext">Contexto del escenario</label>
-                    <textarea id="gameContext" placeholder="Describe aquí el entorno general del battle royale..."></textarea>
-                    <p class="context-hint">Se añadirá a cada solicitud para mantener la coherencia narrativa.</p>
-                </div>
-            </div>
-            <div class="control-panel">
-                <div class="api-key-group">
-                    <label for="apiKey">OpenAI API Key</label>
-                    <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" />
-                </div>
-                <div class="control-buttons">
-                    <button id="configurePlayers" class="secondary">Configurar jugadores</button>
-                    <button id="startGame" class="primary">Comenzar simulación</button>
-                    <button id="resetGame" class="danger">Reiniciar</button>
-                </div>
-            </div>
-        </header>
-
         <main class="main-layout">
-            <section class="game-overview">
-                <div class="stat-card">
-                    <span class="stat-label">Ronda actual</span>
-                    <span class="stat-value" id="roundNumber">0</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Supervivientes</span>
-                    <span class="stat-value" id="playersAlive">24</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Heridos</span>
-                    <span class="stat-value" id="playersInjured">0</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Muertes</span>
-                    <span class="stat-value" id="playersDead">0</span>
-                </div>
-            </section>
-
-            <section class="timeline">
-                <div class="section-header">
-                    <div>
-                        <h2>Relato de eventos</h2>
-                        <p class="section-subtitle">Cada turno se genera automáticamente usando el estado actual del juego y los antecedentes de los jugadores.</p>
+            <div class="left-column">
+                <header class="app-header">
+                    <div class="header-top">
+                        <div class="title-block">
+                            <h1>Simulador Battle Royale</h1>
+                            <p class="subtitle">Una narración automática de supervivencia extrema impulsada por IA.</p>
+                        </div>
+                        <div class="context-group">
+                            <label for="gameContext">Contexto del escenario</label>
+                            <textarea id="gameContext" placeholder="Describe aquí el entorno general del battle royale..."></textarea>
+                            <p class="context-hint">Se añadirá a cada solicitud para mantener la coherencia narrativa.</p>
+                        </div>
                     </div>
-                </div>
-                <div class="event-viewer" aria-live="polite">
-                    <div class="event-stage">
-                        <header class="event-meta">
-                            <span id="eventRound">Sin eventos</span>
-                            <span id="eventStatus" class="event-status">En reposo</span>
-                        </header>
-                        <p id="eventText" class="event-text-display">Inicia la simulación para comenzar a narrar la arena.</p>
+                    <div class="control-panel">
+                        <div class="api-key-group">
+                            <label for="apiKey">OpenAI API Key</label>
+                            <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" />
+                        </div>
+                        <div class="control-buttons">
+                            <button id="configurePlayers" class="secondary">Configurar jugadores</button>
+                            <button id="startGame" class="primary">Comenzar simulación</button>
+                            <button id="resetGame" class="danger">Reiniciar</button>
+                        </div>
                     </div>
-                    <aside id="eventResolution" class="event-resolution" aria-hidden="true">
-                        <h3>Resolución</h3>
-                        <p id="eventResolutionText">Esperando el siguiente evento.</p>
-                    </aside>
-                </div>
-                <div class="event-controls">
-                    <button id="prevEvent" class="control-button" aria-label="Evento anterior" disabled>
-                        <span class="icon" aria-hidden="true">◀</span>
-                        <span class="control-label">Anterior</span>
-                    </button>
-                    <button id="nextEvent" class="control-button primary" aria-label="Generar evento" disabled>
-                        <span class="control-label">Generar</span>
-                        <span class="icon" aria-hidden="true">▶</span>
-                    </button>
-                </div>
-            </section>
+                </header>
 
-            <section class="players-panel">
-                <div class="section-header">
-                    <h2>Participantes</h2>
-                    <p class="section-subtitle">Haz clic en cualquier combatiente para revisar su estado.</p>
-                </div>
-                <div id="playersList" class="players-grid"></div>
-            </section>
+                <section class="game-overview">
+                    <div class="stat-card">
+                        <span class="stat-label">Ronda actual</span>
+                        <span class="stat-value" id="roundNumber">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Supervivientes</span>
+                        <span class="stat-value" id="playersAlive">24</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Heridos</span>
+                        <span class="stat-value" id="playersInjured">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Muertes</span>
+                        <span class="stat-value" id="playersDead">0</span>
+                    </div>
+                </section>
+
+                <section class="timeline">
+                    <div class="section-header">
+                        <div>
+                            <h2>Relato de eventos</h2>
+                            <p class="section-subtitle">Cada turno se genera automáticamente usando el estado actual del juego y los antecedentes de los jugadores.</p>
+                        </div>
+                    </div>
+                    <div class="event-viewer" aria-live="polite">
+                        <div class="event-stage">
+                            <header class="event-meta">
+                                <span id="eventRound">Sin eventos</span>
+                                <span id="eventStatus" class="event-status">En reposo</span>
+                            </header>
+                            <p id="eventText" class="event-text-display">Inicia la simulación para comenzar a narrar la arena.</p>
+                        </div>
+                        <aside id="eventResolution" class="event-resolution" aria-hidden="true">
+                            <h3>Resolución</h3>
+                            <p id="eventResolutionText">Esperando el siguiente evento.</p>
+                        </aside>
+                    </div>
+                    <div class="event-controls">
+                        <button id="prevEvent" class="control-button" aria-label="Evento anterior" disabled>
+                            <span class="icon" aria-hidden="true">◀</span>
+                            <span class="control-label">Anterior</span>
+                        </button>
+                        <button id="nextEvent" class="control-button primary" aria-label="Generar evento" disabled>
+                            <span class="control-label">Generar</span>
+                            <span class="icon" aria-hidden="true">▶</span>
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <div class="right-column">
+                <section class="players-panel">
+                    <div class="section-header">
+                        <h2>Participantes</h2>
+                        <p class="section-subtitle">Haz clic en cualquier combatiente para revisar su estado.</p>
+                    </div>
+                    <div id="playersList" class="players-grid"></div>
+                </section>
+            </div>
         </main>
     </div>
 
