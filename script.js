@@ -252,7 +252,7 @@ class BattleRoyaleSimulator {
 
     planEventOutcome(alivePlayers) {
         if (!alivePlayers.length) {
-            return { type: 'narrative', participants: [] };
+            return { type: 'narrative', tone: 'serio', participants: [] };
         }
 
         const roll = Math.random();
@@ -269,9 +269,18 @@ class BattleRoyaleSimulator {
             return participants;
         };
 
-        if (roll < 0.4) {
+        if (roll < 0.1) {
             return {
                 type: 'narrative',
+                tone: 'comic',
+                participants: pickGroup()
+            };
+        }
+
+        if (roll < 0.3) {
+            return {
+                type: 'narrative',
+                tone: 'serio',
                 participants: pickGroup()
             };
         }
@@ -280,13 +289,14 @@ class BattleRoyaleSimulator {
         if (!victim) {
             return {
                 type: 'narrative',
+                tone: 'serio',
                 participants: pickGroup()
             };
         }
 
         const participants = pickGroup([victim]);
 
-        if (roll < 0.75) {
+        if (roll < 0.8) {
             const injuryOptions = [
                 'contusión en el hombro',
                 'corte profundo en el brazo',
@@ -363,12 +373,24 @@ class BattleRoyaleSimulator {
 
         const participantsNames = participants.map(player => player.name).join(', ');
 
-        let consequenceGuidance = 'Concluye el suceso aclarando que nadie resulta herido ni eliminado.';
-        if (plan?.type === 'injury' && plan?.victim) {
-            consequenceGuidance = `Describe cómo ${plan.victim.name} resulta herido en la escena y pierde ${plan.damage} puntos de vida. Menciona una lesión compatible (${plan.injury}) y deja constancia de que queda ${plan.newState}.`;
+        let consequenceGuidance = 'Deja claro que todos los implicados salen ilesos y con vida.';
+        if (plan?.type === 'narrative' && plan?.tone === 'comic') {
+            consequenceGuidance = 'Usa un tono cómico y ligero. Remata con un detalle humorístico y confirma que nadie resulta herido ni muere.';
+        } else if (plan?.type === 'narrative') {
+            consequenceGuidance = 'Mantén un tono tenso pero sin comedia. Cierra la escena confirmando que nadie resulta herido ni muere.';
+        } else if (plan?.type === 'injury' && plan?.victim) {
+            consequenceGuidance = `Describe cómo ${plan.victim.name} resulta herido en la escena y pierde ${plan.damage} puntos de vida. Menciona una lesión compatible (${plan.injury}), que queda ${plan.newState} y que el resto de participantes continúa con vida.`;
         } else if (plan?.type === 'elimination' && plan?.victim) {
-            consequenceGuidance = `Narra de forma explícita cómo ${plan.victim.name} queda fuera de combate en esta misma escena.`;
+            consequenceGuidance = `Narra de forma explícita cómo ${plan.victim.name} muere en esta misma escena y precisa el estado final del resto de participantes.`;
         }
+
+        const toneGuidance = plan?.type === 'narrative' && plan?.tone === 'comic'
+            ? 'Usa humor breve y amable sin romper la coherencia de la escena.'
+            : plan?.type === 'narrative'
+                ? 'Mantén un tono serio y directo.'
+                : 'Utiliza un tono intenso y claro.';
+
+        const structureGuidance = 'Redacta un único párrafo en español de máximo 80 palabras, sin saltos de línea ni listas. Asegúrate de cerrar por completo la acción sin dejar promesas ni anticipos de futuros sucesos.';
 
         const prompt = `Estamos en un simulador de battle royale en español. Describe un único evento autoconclusivo para la ronda ${this.round}.
 Datos del estado actual:
@@ -384,7 +406,7 @@ ${bioContext}${arenaContext}
 Personajes implicados obligatorios:
 ${participantsSummary}
 
-Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos personajes. El evento debe ser autoconclusivo: cierra la acción en la misma escena, sin cliffhangers ni promesas sobre eventos futuros. ${consequenceGuidance} No incluyas a ningún otro personaje ajeno a la lista (${participantsNames}).`;
+Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidance} ${consequenceGuidance} ${structureGuidance} No incluyas a ningún otro personaje ajeno a la lista (${participantsNames}).`;
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -688,7 +710,10 @@ Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos p
         if (plan.type === 'elimination' && plan.victim) {
             return `Un giro inesperado deja fuera de combate a ${plan.victim.name} durante la refriega.`;
         }
-        return `Los participantes ${names || 'de la zona'} se encuentran, pero la situación se resuelve sin heridas.`;
+        if (plan.type === 'narrative' && plan.tone === 'comic') {
+            return `Los participantes ${names || 'de la zona'} protagonizan un malentendido cómico y todos salen ilesos.`;
+        }
+        return `Los participantes ${names || 'de la zona'} se encuentran, pero la situación se resuelve sin heridas ni bajas.`;
     }
 
     addEvent(text, isLoading = false) {
