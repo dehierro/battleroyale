@@ -1409,12 +1409,12 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
         const imageEl = document.getElementById('modalPlayerImage');
         imageEl.src = player.image;
         imageEl.alt = `Avatar de ${player.name}`;
-        this.playerModal.style.display = 'block';
+        this.playerModal.style.display = 'flex';
     }
 
     showConfigModal() {
         this.configErrorEl.textContent = '';
-        this.configModal.style.display = 'block';
+        this.configModal.style.display = 'flex';
     }
 
     hideModal(modal) {
