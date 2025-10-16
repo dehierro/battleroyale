@@ -756,9 +756,21 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
     }
 
     addEvent(text, isLoading = false) {
+        let providedResolution = '';
+        if (text && typeof text === 'object' && !Array.isArray(text)) {
+            const extracted = this.extractResolutionFromPayload(text);
+            if (this.isMeaningfulEventText(extracted)) {
+                providedResolution = extracted.trim();
+            }
+        }
+
+        const bannedTexts = providedResolution
+            ? new Set([providedResolution.trim().toLowerCase()])
+            : null;
+
         const normalizedText = typeof text === 'string'
             ? text
-            : this.normalizeEventText(text);
+            : this.normalizeEventText(text, new Set(), { bannedTexts });
         const finalText = normalizedText && normalizedText.trim()
             ? normalizedText.trim()
             : 'Evento sin descripción disponible.';
@@ -767,7 +779,8 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
             round: this.round,
             text: finalText,
             isLoading,
-            resolution: this.deriveResolutionFromText(finalText, this.round, isLoading)
+            resolution: providedResolution
+                || this.deriveResolutionFromText(finalText, this.round, isLoading)
         };
         this.events.push(event);
         const shouldAnimate = !isLoading;
@@ -775,14 +788,15 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
         this.updateEventControls();
     }
 
-    normalizeEventText(payload, visited = new Set()) {
+    normalizeEventText(payload, visited = new Set(), options = {}) {
         if (payload === null || payload === undefined) {
             return '';
         }
 
         const payloadType = typeof payload;
         if (payloadType === 'string') {
-            return payload;
+            const bannedTexts = options?.bannedTexts instanceof Set ? options.bannedTexts : null;
+            return this.isBannedEventText(payload, bannedTexts) ? '' : payload;
         }
         if (payloadType === 'number' || payloadType === 'boolean') {
             return String(payload);
@@ -793,16 +807,18 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
         }
 
         if (Array.isArray(payload)) {
+            const bannedTexts = options?.bannedTexts instanceof Set ? options.bannedTexts : null;
             visited.add(payload);
             const parts = payload
-                .map(item => this.normalizeEventText(item, visited))
-                .filter(part => this.isMeaningfulEventText(part));
+                .map(item => this.normalizeEventText(item, visited, options))
+                .filter(part => this.isMeaningfulEventText(part) && !this.isBannedEventText(part, bannedTexts));
             visited.delete(payload);
             return parts.join('\n');
         }
 
         if (payloadType === 'object') {
             visited.add(payload);
+            const bannedTexts = options?.bannedTexts instanceof Set ? options.bannedTexts : null;
             const preferredKeys = [
                 'summary',
                 'narrative',
@@ -830,22 +846,38 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
             const collected = [];
             for (const key of preferredKeys) {
                 if (Object.prototype.hasOwnProperty.call(payload, key)) {
-                    const candidate = this.normalizeEventText(payload[key], visited);
-                    if (this.isMeaningfulEventText(candidate)) {
-                        collected.push(candidate.trim());
+                    const candidate = this.normalizeEventText(payload[key], visited, options);
+                    const trimmedCandidate = typeof candidate === 'string' ? candidate.trim() : '';
+                    if (this.isMeaningfulEventText(trimmedCandidate) && !this.isBannedEventText(trimmedCandidate, bannedTexts)) {
+                        collected.push(trimmedCandidate);
                     }
                 }
             }
 
             if (!collected.length) {
-                const ignoredKeys = new Set(['round', 'ronda', 'turn', 'turno', 'id']);
+                const ignoredKeys = new Set([
+                    'round',
+                    'ronda',
+                    'turn',
+                    'turno',
+                    'id',
+                    'resolution',
+                    'resolucion',
+                    'resolución',
+                    'resolutiontext',
+                    'resolution_text',
+                    'texto_resolucion',
+                    'texto_resolución',
+                    'textoresolution'
+                ]);
                 for (const [key, value] of Object.entries(payload)) {
                     if (ignoredKeys.has(key.toLowerCase())) {
                         continue;
                     }
-                    const candidate = this.normalizeEventText(value, visited);
-                    if (this.isMeaningfulEventText(candidate)) {
-                        collected.push(candidate.trim());
+                    const candidate = this.normalizeEventText(value, visited, options);
+                    const trimmedCandidate = typeof candidate === 'string' ? candidate.trim() : '';
+                    if (this.isMeaningfulEventText(trimmedCandidate) && !this.isBannedEventText(trimmedCandidate, bannedTexts)) {
+                        collected.push(trimmedCandidate);
                     }
                 }
             }
@@ -864,6 +896,66 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
         }
     }
 
+    extractResolutionFromPayload(payload, visited = new Set()) {
+        if (!payload || visited.has(payload)) {
+            return '';
+        }
+
+        if (typeof payload === 'string') {
+            const trimmed = payload.trim();
+            return trimmed;
+        }
+
+        if (Array.isArray(payload)) {
+            visited.add(payload);
+            for (const item of payload) {
+                const candidate = this.extractResolutionFromPayload(item, visited);
+                if (this.isMeaningfulEventText(candidate)) {
+                    visited.delete(payload);
+                    return candidate.trim();
+                }
+            }
+            visited.delete(payload);
+            return '';
+        }
+
+        if (typeof payload !== 'object') {
+            return '';
+        }
+
+        visited.add(payload);
+        const resolutionKeys = [
+            'resolution',
+            'resolucion',
+            'resolución',
+            'resolutiontext',
+            'resolution_text',
+            'texto_resolucion',
+            'texto_resolución',
+            'textoresolution',
+            'finalresolution',
+            'final_resolution'
+        ];
+
+        for (const [key, value] of Object.entries(payload)) {
+            const normalizedKey = key.toLowerCase();
+            const matchesResolution = resolutionKeys.includes(normalizedKey)
+                || normalizedKey.includes('resolution')
+                || normalizedKey.includes('resoluci');
+            if (!matchesResolution) {
+                continue;
+            }
+            const candidate = this.extractResolutionFromPayload(value, visited);
+            if (this.isMeaningfulEventText(candidate)) {
+                visited.delete(payload);
+                return candidate.trim();
+            }
+        }
+
+        visited.delete(payload);
+        return '';
+    }
+
     isMeaningfulEventText(candidate) {
         if (typeof candidate !== 'string') {
             return false;
@@ -877,6 +969,17 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
             return false;
         }
         return true;
+    }
+
+    isBannedEventText(candidate, bannedTexts) {
+        if (!bannedTexts || !bannedTexts.size || typeof candidate !== 'string') {
+            return false;
+        }
+        const normalized = candidate.trim().toLowerCase();
+        if (!normalized) {
+            return false;
+        }
+        return bannedTexts.has(normalized);
     }
 
     removeLoadingEvents() {
