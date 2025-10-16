@@ -25,6 +25,9 @@ class BattleRoyaleSimulator {
         this.eventIdCounter = 0;
         this.typingTimeouts = [];
         this.isTyping = false;
+        this.setupComplete = false;
+        this.setupInProgress = false;
+        this.pixelArtDirectory = 'images/players_pixelart';
 
         this.cacheDom();
         this.registerEventListeners();
@@ -34,6 +37,261 @@ class BattleRoyaleSimulator {
     async initialize() {
         await this.loadPlayersFromFile();
         this.updateDisplay();
+        this.updateSetupControls();
+    }
+
+    async initializeStory() {
+        if (this.setupInProgress) return;
+        if (!this.playersLoaded) {
+            alert('Los jugadores todavía se están cargando. Inténtalo de nuevo en unos segundos.');
+            return;
+        }
+
+        const providedKey = this.apiKeyInput.value.trim();
+        if (!providedKey) {
+            alert('Introduce tu clave de API de OpenAI para preparar los retratos pixel art.');
+            return;
+        }
+
+        this.apiKey = providedKey;
+        this.setupInProgress = true;
+        this.setupComplete = false;
+        this.updateSetupControls();
+
+        if (this.playersListEl) {
+            this.playersListEl.classList.add('is-placeholder');
+            this.playersListEl.innerHTML = `
+                <div class="players-placeholder">
+                    <strong>Generando retratos pixel art...</strong>
+                    <p>Esto puede tardar unos instantes mientras se crea una imagen para cada combatiente.</p>
+                </div>
+            `;
+        }
+
+        try {
+            await this.ensurePixelArtImages();
+            this.setupComplete = true;
+            this.updateDisplay();
+        } catch (error) {
+            console.error('Error durante la inicialización de la historia.', error);
+            alert('No se pudieron generar todas las imágenes pixel art. Revisa la consola para más detalles.');
+        } finally {
+            this.setupInProgress = false;
+            this.updateSetupControls();
+            if (this.setupComplete) {
+                this.updateDisplay();
+            } else if (this.playersListEl) {
+                this.playersListEl.classList.add('is-placeholder');
+                this.playersListEl.innerHTML = `
+                    <div class="players-placeholder">
+                        <strong>No se completó la inicialización</strong>
+                        <p>Vuelve a intentarlo cuando tengas conexión y una clave de API válida.</p>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    async ensurePixelArtImages() {
+        for (const player of this.players) {
+            try {
+                const pixelArtPath = await this.ensurePixelArtForPlayer(player);
+                if (pixelArtPath) {
+                    player.pixelArtImage = pixelArtPath;
+                }
+            } catch (error) {
+                throw new Error(`No se pudo preparar la imagen de ${player.name}: ${error.message}`);
+            }
+        }
+    }
+
+    async ensurePixelArtForPlayer(player) {
+        if (!player) return null;
+        const filename = this.buildPixelArtFilename(player);
+        const relativePath = `${this.pixelArtDirectory}/${filename}`;
+        const alreadyExists = await this.checkImageExists(relativePath);
+        if (alreadyExists) {
+            return relativePath;
+        }
+
+        const referenceBlob = await this.prepareReferenceBlob(player);
+        const generatedBase64 = await this.requestPixelArtFromOpenAI(player, referenceBlob);
+        await this.savePixelArtImage(filename, generatedBase64);
+        return relativePath;
+    }
+
+    buildPixelArtFilename(player) {
+        const originalPath = typeof player?.originalImage === 'string' ? player.originalImage : player?.image;
+        const fromImage = this.extractFileStem(originalPath);
+        const fromName = this.slugify(player?.name);
+        const base = fromImage || fromName || `player-${player?.id ?? 'anonimo'}`;
+        return `${base}.png`;
+    }
+
+    extractFileStem(path) {
+        if (!path || typeof path !== 'string') return '';
+        const segments = path.split('/');
+        const last = segments[segments.length - 1] || '';
+        const [stem] = last.split('.');
+        return this.slugify(stem);
+    }
+
+    slugify(value) {
+        if (!value || typeof value !== 'string') return '';
+        return value
+            .normalize('NFD')
+            .replace(/[^\w\s-]/g, '')
+            .trim()
+            .replace(/[\s_]+/g, '-')
+            .toLowerCase();
+    }
+
+    async checkImageExists(path) {
+        try {
+            const response = await fetch(path, { method: 'HEAD', cache: 'no-store' });
+            return response.ok;
+        } catch (error) {
+            console.warn(`No se pudo comprobar la existencia de ${path}:`, error);
+            return false;
+        }
+    }
+
+    async prepareReferenceBlob(player) {
+        const source = typeof player?.originalImage === 'string' ? player.originalImage : player?.image;
+        const assetUrl = this.resolveAssetUrl(source);
+        const blob = await this.fetchImageBlob(assetUrl);
+        if (blob.type === 'image/png' || blob.type === 'image/jpeg') {
+            return blob;
+        }
+        try {
+            const pngBlob = await this.convertBlobToPng(blob);
+            if (pngBlob) {
+                return pngBlob;
+            }
+        } catch (error) {
+            console.warn('No se pudo convertir la imagen de referencia a PNG. Se usará el formato original.', error);
+        }
+        return blob;
+    }
+
+    resolveAssetUrl(path) {
+        try {
+            return new URL(path, window.location.origin).href;
+        } catch (error) {
+            return path;
+        }
+    }
+
+    async fetchImageBlob(url) {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`No se pudo obtener la imagen de referencia (${response.status})`);
+        }
+        return await response.blob();
+    }
+
+    convertBlobToPng(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('No se pudo leer la imagen de referencia.'));
+            reader.onload = () => {
+                const image = new Image();
+                image.crossOrigin = 'anonymous';
+                image.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = image.width || 512;
+                    canvas.height = image.height || 512;
+                    const context = canvas.getContext('2d');
+                    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob((result) => {
+                        if (result) {
+                            resolve(result);
+                        } else {
+                            reject(new Error('No se pudo generar un PNG desde la imagen de referencia.'));
+                        }
+                    }, 'image/png');
+                };
+                image.onerror = () => reject(new Error('No se pudo cargar la imagen de referencia.'));
+                image.src = reader.result;
+            };
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    async requestPixelArtFromOpenAI(player, referenceBlob) {
+        const formData = new FormData();
+        formData.append('model', 'gpt-image-1-mini');
+        formData.append('prompt', this.buildPixelArtPrompt(player));
+        formData.append('size', '512x512');
+        if (referenceBlob) {
+            const extension = this.inferExtension(referenceBlob.type);
+            formData.append('image', referenceBlob, `referencia.${extension}`);
+        }
+
+        const response = await fetch('https://api.openai.com/v1/images/edits', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${this.apiKey}`
+            },
+            body: formData
+        });
+
+        const responseBody = await response.text();
+
+        if (!response.ok) {
+            let details = '';
+            try {
+                const parsed = JSON.parse(responseBody);
+                details = parsed?.error?.message || parsed?.message || '';
+            } catch (parseError) {
+                details = responseBody;
+            }
+            const suffix = details ? `: ${details}` : '';
+            throw new Error(`Error al generar imagen (${response.status})${suffix}`);
+        }
+
+        let data;
+        try {
+            data = JSON.parse(responseBody);
+        } catch (error) {
+            throw new Error('La API devolvió una respuesta no válida.');
+        }
+        const base64 = data?.data?.[0]?.b64_json;
+        if (!base64) {
+            throw new Error('La API no devolvió una imagen válida.');
+        }
+        return base64;
+    }
+
+    inferExtension(mimeType) {
+        if (mimeType === 'image/png') return 'png';
+        if (mimeType === 'image/jpeg') return 'jpg';
+        if (mimeType === 'image/svg+xml') return 'svg';
+        return 'img';
+    }
+
+    buildPixelArtPrompt(player) {
+        const name = player?.name || 'combatiente';
+        const traits = player?.bio ? `Detalles clave: ${player.bio}` : '';
+        return `Transforma la referencia proporcionada en un retrato de ${name} con estilo pixel art medieval, iluminado dramáticamente y con estética heroica. ${traits}`;
+    }
+
+    async savePixelArtImage(filename, base64Image) {
+        const response = await fetch('/api/pixel-art', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                directory: this.pixelArtDirectory,
+                filename,
+                imageBase64: base64Image
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`No se pudo guardar la imagen (${response.status})`);
+        }
     }
 
     cacheDom() {
@@ -55,11 +313,21 @@ class BattleRoyaleSimulator {
         this.eventResolutionTextEl = document.getElementById('eventResolutionText');
         this.prevEventButton = document.getElementById('prevEvent');
         this.nextEventButton = document.getElementById('nextEvent');
+        this.initializeStoryButton = document.getElementById('initializeStory');
+        this.startGameButton = document.getElementById('startGame');
+        this.resetGameButton = document.getElementById('resetGame');
     }
 
     registerEventListeners() {
-        document.getElementById('startGame').addEventListener('click', () => this.startGame());
-        document.getElementById('resetGame').addEventListener('click', () => this.resetGame());
+        if (this.initializeStoryButton) {
+            this.initializeStoryButton.addEventListener('click', () => this.initializeStory());
+        }
+        if (this.startGameButton) {
+            this.startGameButton.addEventListener('click', () => this.startGame());
+        }
+        if (this.resetGameButton) {
+            this.resetGameButton.addEventListener('click', () => this.resetGame());
+        }
         if (this.prevEventButton) {
             this.prevEventButton.addEventListener('click', () => this.navigateEvent(-1));
         }
@@ -110,6 +378,7 @@ class BattleRoyaleSimulator {
         }
 
         this.updateEventControls();
+        this.updateSetupControls();
     }
 
     normalizePlayer(entry, index) {
@@ -158,6 +427,8 @@ class BattleRoyaleSimulator {
             name,
             bio: description,
             image: imageUrl,
+            originalImage: imageUrl,
+            pixelArtImage: null,
             hp: sanitizedHp,
             maxHp: sanitizedMaxHp,
             injuries: Array.isArray(injuries) ? injuries.slice(0, 5) : [],
@@ -181,11 +452,13 @@ class BattleRoyaleSimulator {
             this.players = parsed.map((player, index) => this.normalizePlayer(player, index));
             this.playersLoaded = true;
             this.populatePlayersConfig();
+            this.setupComplete = false;
         } catch (error) {
             console.error('No se pudieron cargar los jugadores desde data/players.json. Se usará una lista por defecto.', error);
             this.players = FALLBACK_PLAYERS.map((player, index) => this.normalizePlayer(player, index));
             this.playersLoaded = true;
             this.populatePlayersConfig();
+            this.setupComplete = false;
         }
     }
 
@@ -207,6 +480,10 @@ class BattleRoyaleSimulator {
             alert('Los jugadores todavía se están cargando. Inténtalo de nuevo en unos segundos.');
             return;
         }
+        if (!this.setupComplete) {
+            alert('Debes inicializar la historia antes de comenzar la simulación.');
+            return;
+        }
         this.apiKey = this.apiKeyInput.value.trim();
         this.globalContext = this.contextInput ? this.contextInput.value : '';
         if (!this.apiKey) {
@@ -226,9 +503,12 @@ class BattleRoyaleSimulator {
             ? 'La arena se activa. Solo queda un combatiente en juego.'
             : `La arena se activa. ${aliveCount} combatientes entran en juego.`;
         this.addEvent(rosterMessage);
-        document.getElementById('startGame').disabled = true;
+        if (this.startGameButton) {
+            this.startGameButton.disabled = true;
+        }
         this.apiKeyInput.disabled = true;
         this.updateEventControls();
+        this.updateSetupControls();
     }
 
     async resetGame() {
@@ -243,8 +523,11 @@ class BattleRoyaleSimulator {
         this.updateDisplay();
         this.apiKeyInput.disabled = false;
         this.apiKeyInput.value = '';
-        document.getElementById('startGame').disabled = false;
+        if (this.startGameButton) {
+            this.startGameButton.disabled = false;
+        }
         this.updateEventControls();
+        this.updateSetupControls();
     }
 
     async runEventTurn() {
@@ -1086,6 +1369,30 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
         }
     }
 
+    updateSetupControls() {
+        if (this.initializeStoryButton) {
+            if (!this.initializeStoryButton.dataset.defaultLabel) {
+                this.initializeStoryButton.dataset.defaultLabel = this.initializeStoryButton.textContent;
+            }
+            this.initializeStoryButton.disabled = !this.playersLoaded || this.setupInProgress;
+            this.initializeStoryButton.textContent = this.setupInProgress
+                ? 'Inicializando...'
+                : this.initializeStoryButton.dataset.defaultLabel;
+        }
+
+        if (this.startGameButton) {
+            const shouldDisable = this.setupInProgress || !this.setupComplete || this.gameRunning;
+            this.startGameButton.disabled = shouldDisable || this.startGameButton.disabled;
+            if (!this.gameRunning && !shouldDisable && !this.apiKeyInput.disabled) {
+                this.startGameButton.disabled = false;
+            }
+        }
+
+        if (this.resetGameButton) {
+            this.resetGameButton.disabled = this.setupInProgress;
+        }
+    }
+
     displayEmptyEvent() {
         this.cancelTyping();
         this.currentEventIndex = -1;
@@ -1341,6 +1648,18 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
     renderPlayers() {
         if (!this.playersListEl) return;
         this.playersListEl.innerHTML = '';
+        if (!this.setupComplete) {
+            this.playersListEl.classList.add('is-placeholder');
+            this.playersListEl.innerHTML = `
+                <div class="players-placeholder">
+                    <strong>Inicializa la historia</strong>
+                    <p>Prepara los retratos pixel art medieval de los combatientes antes de mostrarlos.</p>
+                </div>
+            `;
+            return;
+        }
+
+        this.playersListEl.classList.remove('is-placeholder');
         this.players.forEach(player => {
             const card = document.createElement('button');
             card.type = 'button';
@@ -1354,8 +1673,9 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
             const currentHp = Math.max(0, Math.min(totalHp, player.hp ?? 0));
             const hpPercent = totalHp > 0 ? Math.round((currentHp / totalHp) * 100) : 0;
             const hpLevelClass = hpPercent <= 25 ? 'critical' : hpPercent <= 60 ? 'warning' : 'healthy';
+            const avatarSrc = player.pixelArtImage || player.image;
             card.innerHTML = `
-                <img class="player-avatar" src="${player.image}" alt="Avatar de ${player.name}" loading="lazy" />
+                <img class="player-avatar" src="${avatarSrc}" alt="Avatar de ${player.name}" loading="lazy" />
                 <h3 class="player-name" title="${player.name}">${player.name}</h3>
                 <div class="player-quick-info">
                     <div class="player-hp-block">
@@ -1407,7 +1727,8 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
             }
         }
         const imageEl = document.getElementById('modalPlayerImage');
-        imageEl.src = player.image;
+        const modalAvatar = player.pixelArtImage || player.image;
+        imageEl.src = modalAvatar;
         imageEl.alt = `Avatar de ${player.name}`;
         this.playerModal.style.display = 'flex';
     }
@@ -1432,9 +1753,11 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
             this.players = parsed.map((entry, index) => this.normalizePlayer(entry, index));
             this.playersLoaded = true;
             this.populatePlayersConfig();
+            this.setupComplete = false;
             this.hideModal(this.configModal);
             this.updateDisplay();
             this.updateEventControls();
+            this.updateSetupControls();
         } catch (error) {
             this.configErrorEl.textContent = error.message;
         }
