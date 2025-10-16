@@ -708,10 +708,14 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
             }
             if (victim.hp <= 0) {
                 this.eliminatePlayer(victim);
-                this.addEvent(`${victim.name} no resiste las heridas y queda eliminado.`);
+                this.appendResolutionLogs([
+                    `${victim.name} no resiste las heridas y queda eliminado.`
+                ]);
             } else {
                 victim.status = 'injured';
-                this.addEvent(`${victim.name} queda herido (-${damage} HP).`);
+                this.appendResolutionLogs([
+                    `${victim.name} queda herido (-${damage} HP).`
+                ]);
             }
             return;
         }
@@ -719,7 +723,9 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
         if (plan.type === 'elimination' && plan.victim) {
             const target = plan.victim;
             this.eliminatePlayer(target);
-            this.addEvent(`❌ ${target.name} ha sido eliminado en la ronda ${this.round}.`);
+            this.appendResolutionLogs([
+                `❌ ${target.name} ha sido eliminado en la ronda ${this.round}.`
+            ]);
         }
     }
 
@@ -1201,6 +1207,38 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
         }
         this.eventResolutionEl.classList.add('visible');
         this.eventResolutionEl.setAttribute('aria-hidden', 'false');
+    }
+
+    appendResolutionLogs(logEntries) {
+        if (!Array.isArray(logEntries) || !logEntries.length) {
+            return;
+        }
+
+        const cleanedLogs = logEntries
+            .map(entry => typeof entry === 'string' ? entry.trim() : '')
+            .filter(Boolean);
+        if (!cleanedLogs.length) {
+            return;
+        }
+
+        const targetEvent = [...this.events]
+            .reverse()
+            .find(candidate => candidate && !candidate.isLoading);
+        if (!targetEvent) {
+            return;
+        }
+
+        const baseResolution = typeof targetEvent.resolution === 'string'
+            ? targetEvent.resolution.trim()
+            : '';
+        const combined = baseResolution
+            ? [baseResolution, ...cleanedLogs]
+            : cleanedLogs;
+        targetEvent.resolution = combined.join(' ');
+
+        if (this.displayedEventId === targetEvent.id && this.eventResolutionTextEl) {
+            this.eventResolutionTextEl.textContent = targetEvent.resolution;
+        }
     }
 
     hideResolution() {
