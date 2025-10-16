@@ -20,6 +20,11 @@ class BattleRoyaleSimulator {
         this.events = [];
         this.playersLoaded = false;
         this.globalContext = '';
+        this.currentEventIndex = -1;
+        this.displayedEventId = null;
+        this.eventIdCounter = 0;
+        this.typingTimeouts = [];
+        this.isTyping = false;
 
         this.cacheDom();
         this.registerEventListeners();
@@ -33,7 +38,6 @@ class BattleRoyaleSimulator {
 
     cacheDom() {
         this.playersListEl = document.getElementById('playersList');
-        this.eventsLogEl = document.getElementById('eventsLog');
         this.roundNumberEl = document.getElementById('roundNumber');
         this.playersAliveEl = document.getElementById('playersAlive');
         this.playersInjuredEl = document.getElementById('playersInjured');
@@ -44,14 +48,23 @@ class BattleRoyaleSimulator {
         this.playerModal = document.getElementById('playerModal');
         this.playersConfigInput = document.getElementById('playersConfig');
         this.configErrorEl = document.getElementById('configError');
+        this.eventRoundEl = document.getElementById('eventRound');
+        this.eventStatusEl = document.getElementById('eventStatus');
+        this.eventTextEl = document.getElementById('eventText');
+        this.eventResolutionEl = document.getElementById('eventResolution');
+        this.eventResolutionTextEl = document.getElementById('eventResolutionText');
+        this.prevEventButton = document.getElementById('prevEvent');
         this.nextEventButton = document.getElementById('nextEvent');
     }
 
     registerEventListeners() {
         document.getElementById('startGame').addEventListener('click', () => this.startGame());
         document.getElementById('resetGame').addEventListener('click', () => this.resetGame());
+        if (this.prevEventButton) {
+            this.prevEventButton.addEventListener('click', () => this.navigateEvent(-1));
+        }
         if (this.nextEventButton) {
-            this.nextEventButton.addEventListener('click', () => this.runEventTurn());
+            this.nextEventButton.addEventListener('click', () => this.handleNextEventAction());
         }
         document.getElementById('configurePlayers').addEventListener('click', () => this.showConfigModal());
         document.getElementById('loadPlayers').addEventListener('click', () => this.updatePlayersFromConfig());
@@ -72,6 +85,21 @@ class BattleRoyaleSimulator {
             if (event.key === 'Escape') {
                 this.hideModal(this.playerModal);
                 this.hideModal(this.configModal);
+                return;
+            }
+            const targetTag = event.target?.tagName?.toLowerCase?.();
+            if (targetTag === 'textarea' || targetTag === 'input') {
+                return;
+            }
+            const modalOpen = (this.playerModal && this.playerModal.style.display === 'block')
+                || (this.configModal && this.configModal.style.display === 'block');
+            if (modalOpen) {
+                return;
+            }
+            if (event.key === 'ArrowLeft') {
+                this.navigateEvent(-1);
+            } else if (event.key === 'ArrowRight') {
+                this.handleNextEventAction();
             }
         });
 
@@ -81,7 +109,7 @@ class BattleRoyaleSimulator {
             });
         }
 
-        this.updateNextEventButton();
+        this.updateEventControls();
     }
 
     normalizePlayer(entry, index) {
@@ -189,6 +217,9 @@ class BattleRoyaleSimulator {
         this.isProcessingEvent = false;
         this.round = 0;
         this.events = [];
+        this.currentEventIndex = -1;
+        this.displayedEventId = null;
+        this.cancelTyping();
         this.updateDisplay();
         const aliveCount = this.players.filter(player => player.status !== 'dead').length;
         const rosterMessage = aliveCount === 1
@@ -197,7 +228,7 @@ class BattleRoyaleSimulator {
         this.addEvent(rosterMessage);
         document.getElementById('startGame').disabled = true;
         this.apiKeyInput.disabled = true;
-        this.updateNextEventButton();
+        this.updateEventControls();
     }
 
     async resetGame() {
@@ -205,16 +236,23 @@ class BattleRoyaleSimulator {
         this.isProcessingEvent = false;
         this.round = 0;
         this.events = [];
+        this.currentEventIndex = -1;
+        this.displayedEventId = null;
+        this.cancelTyping();
         await this.loadPlayersFromFile();
         this.updateDisplay();
         this.apiKeyInput.disabled = false;
         this.apiKeyInput.value = '';
         document.getElementById('startGame').disabled = false;
-        this.updateNextEventButton();
+        this.updateEventControls();
     }
 
     async runEventTurn() {
         if (!this.gameRunning || this.isProcessingEvent) return;
+
+        if (this.isTyping && this.currentEventIndex >= 0) {
+            this.showEvent(this.currentEventIndex, { instant: true });
+        }
 
         const alivePlayers = this.players.filter(player => player.status === 'alive');
         if (alivePlayers.length <= 1) {
@@ -225,8 +263,8 @@ class BattleRoyaleSimulator {
         const plan = this.planEventOutcome(alivePlayers);
 
         this.isProcessingEvent = true;
+        this.updateEventControls();
         this.round += 1;
-        this.updateNextEventButton();
         this.addEvent(`⏳ Generando evento de la ronda ${this.round}...`, true);
 
         try {
@@ -246,8 +284,9 @@ class BattleRoyaleSimulator {
         const hasWinner = this.checkForWinner();
         this.isProcessingEvent = false;
         if (!hasWinner) {
-            this.updateNextEventButton();
+            this.updateEventControls();
         }
+        this.updateEventControls();
     }
 
     planEventOutcome(alivePlayers) {
@@ -723,8 +762,17 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
         const finalText = normalizedText && normalizedText.trim()
             ? normalizedText.trim()
             : 'Evento sin descripción disponible.';
-        this.events.push({ round: this.round, text: finalText, isLoading });
-        this.renderEvents();
+        const event = {
+            id: ++this.eventIdCounter,
+            round: this.round,
+            text: finalText,
+            isLoading,
+            resolution: this.deriveResolutionFromText(finalText, this.round, isLoading)
+        };
+        this.events.push(event);
+        const shouldAnimate = !isLoading;
+        this.showEvent(this.events.length - 1, { instant: !shouldAnimate });
+        this.updateEventControls();
     }
 
     normalizeEventText(payload, visited = new Set()) {
@@ -832,7 +880,17 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
     }
 
     removeLoadingEvents() {
+        const wasViewingLoading = this.currentEventIndex >= 0 && this.events[this.currentEventIndex]?.isLoading;
         this.events = this.events.filter(event => !event.isLoading);
+        if (!this.events.length) {
+            this.currentEventIndex = -1;
+            this.displayedEventId = null;
+        } else if (this.currentEventIndex >= this.events.length) {
+            this.currentEventIndex = this.events.length - 1;
+            this.displayedEventId = null;
+        } else if (wasViewingLoading) {
+            this.displayedEventId = null;
+        }
         this.renderEvents();
     }
 
@@ -854,28 +912,289 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
     }
 
     renderEvents() {
-        if (!this.eventsLogEl) return;
-        this.eventsLogEl.innerHTML = '';
-        const lastEvents = this.events.slice(-20);
-        lastEvents.forEach(event => {
-            const eventEl = document.createElement('article');
-            eventEl.className = `event ${event.isLoading ? 'loading' : ''}`;
-            eventEl.innerHTML = `
-                <header class="event-meta">
-                    <span class="event-round">Ronda ${event.round}</span>
-                </header>
-                <p class="event-text">${event.text}</p>
-            `;
-            this.eventsLogEl.appendChild(eventEl);
-        });
-        this.eventsLogEl.scrollTop = this.eventsLogEl.scrollHeight;
+        if (!this.events.length) {
+            this.displayEmptyEvent();
+            return;
+        }
+
+        if (this.currentEventIndex < 0 || this.currentEventIndex >= this.events.length) {
+            this.showEvent(this.events.length - 1, { instant: true });
+            return;
+        }
+
+        const currentEvent = this.events[this.currentEventIndex];
+        if (!currentEvent) {
+            this.displayEmptyEvent();
+            return;
+        }
+
+        if (this.isTyping && currentEvent.id === this.displayedEventId) {
+            this.updateEventControls();
+            return;
+        }
+
+        if (currentEvent.id !== this.displayedEventId) {
+            this.showEvent(this.currentEventIndex, { instant: true });
+            return;
+        }
+
+        this.renderEventInstant(currentEvent);
+        this.updateEventControls();
     }
 
-    updateNextEventButton() {
-        if (!this.nextEventButton) return;
-        const shouldEnable = this.gameRunning && !this.isProcessingEvent;
-        this.nextEventButton.disabled = !shouldEnable;
-        this.nextEventButton.textContent = this.isProcessingEvent ? 'Generando...' : 'Siguiente evento';
+    updateEventControls() {
+        const hasEvents = this.events.length > 0;
+        const atFirst = this.currentEventIndex <= 0;
+        const atLatest = !hasEvents || this.currentEventIndex >= this.events.length - 1;
+        const canGenerate = this.gameRunning && !this.isProcessingEvent;
+
+        if (this.prevEventButton) {
+            this.prevEventButton.disabled = !hasEvents || atFirst || this.isTyping;
+        }
+
+        if (this.nextEventButton) {
+            const labelEl = this.nextEventButton.querySelector('.control-label');
+            const action = atLatest ? 'generate' : 'navigate';
+            if (!hasEvents) {
+                this.nextEventButton.disabled = !canGenerate || this.isTyping;
+            } else if (action === 'generate') {
+                this.nextEventButton.disabled = !canGenerate || this.isTyping;
+            } else {
+                this.nextEventButton.disabled = this.isTyping;
+            }
+            this.nextEventButton.classList.toggle('loading', this.isProcessingEvent && action === 'generate');
+            if (labelEl) {
+                if (action === 'generate') {
+                    labelEl.textContent = this.isProcessingEvent ? 'Generando...' : 'Generar';
+                } else {
+                    labelEl.textContent = 'Siguiente';
+                }
+            }
+            const ariaLabel = action === 'generate'
+                ? (this.isProcessingEvent ? 'Generando evento' : 'Generar nuevo evento')
+                : 'Ver siguiente evento';
+            this.nextEventButton.setAttribute('aria-label', ariaLabel);
+        }
+    }
+
+    displayEmptyEvent() {
+        this.cancelTyping();
+        this.currentEventIndex = -1;
+        this.displayedEventId = null;
+        if (this.eventRoundEl) {
+            this.eventRoundEl.textContent = 'Sin eventos';
+        }
+        if (this.eventStatusEl) {
+            this.eventStatusEl.textContent = this.gameRunning ? 'Esperando evento' : 'En reposo';
+        }
+        if (this.eventTextEl) {
+            this.eventTextEl.textContent = this.gameRunning
+                ? 'Pulsa la flecha derecha para solicitar el próximo evento.'
+                : 'Inicia la simulación para comenzar a narrar la arena.';
+        }
+        if (this.eventResolutionTextEl) {
+            this.eventResolutionTextEl.textContent = this.gameRunning
+                ? 'A la espera de acciones en la arena.'
+                : 'Configura los combatientes y comienza la partida.';
+        }
+        this.hideResolution();
+        this.updateEventControls();
+    }
+
+    cancelTyping() {
+        this.typingTimeouts.forEach(timeout => clearTimeout(timeout));
+        this.typingTimeouts = [];
+        this.isTyping = false;
+    }
+
+    renderEventInstant(event) {
+        if (!event) return;
+        this.cancelTyping();
+        this.displayedEventId = event.id;
+        if (this.eventRoundEl) {
+            this.eventRoundEl.textContent = `Ronda ${event.round}`;
+        }
+        if (this.eventStatusEl) {
+            this.eventStatusEl.textContent = event.isLoading ? 'Generando...' : 'Resuelto';
+        }
+        if (this.eventTextEl) {
+            this.eventTextEl.textContent = event.text;
+        }
+        if (event.isLoading) {
+            this.hideResolution();
+        } else {
+            this.showResolution(event);
+        }
+        this.updateEventControls();
+    }
+
+    showEvent(index, { instant = false } = {}) {
+        if (!this.events.length) {
+            this.displayEmptyEvent();
+            return;
+        }
+
+        const maxIndex = this.events.length - 1;
+        const targetIndex = Math.min(Math.max(index, 0), maxIndex);
+        const event = this.events[targetIndex];
+        if (!event) {
+            this.displayEmptyEvent();
+            return;
+        }
+
+        this.currentEventIndex = targetIndex;
+        this.displayedEventId = event.id;
+        if (instant || event.isLoading || !event.text.length) {
+            this.renderEventInstant(event);
+            return;
+        }
+
+        this.cancelTyping();
+        if (this.eventRoundEl) {
+            this.eventRoundEl.textContent = `Ronda ${event.round}`;
+        }
+        if (this.eventStatusEl) {
+            this.eventStatusEl.textContent = 'Narrando...';
+        }
+        if (this.eventTextEl) {
+            this.eventTextEl.textContent = '';
+        }
+        this.hideResolution();
+        this.isTyping = true;
+        const characters = Array.from(event.text);
+        const revealNext = (position) => {
+            if (this.displayedEventId !== event.id || !this.eventTextEl) {
+                return;
+            }
+            this.eventTextEl.textContent = characters.slice(0, position).join('');
+            if (position < characters.length) {
+                const timeout = setTimeout(() => revealNext(position + 1), 18);
+                this.typingTimeouts.push(timeout);
+            } else {
+                this.isTyping = false;
+                if (this.eventStatusEl) {
+                    this.eventStatusEl.textContent = 'Resuelto';
+                }
+                const timeout = setTimeout(() => {
+                    if (this.displayedEventId === event.id) {
+                        this.showResolution(event);
+                    }
+                }, 280);
+                this.typingTimeouts.push(timeout);
+                this.updateEventControls();
+            }
+        };
+
+        revealNext(1);
+        this.updateEventControls();
+    }
+
+    showResolution(event) {
+        if (!this.eventResolutionEl) return;
+        if (this.eventResolutionTextEl) {
+            this.eventResolutionTextEl.textContent = event?.resolution
+                ? event.resolution
+                : 'Evento completado.';
+        }
+        this.eventResolutionEl.classList.add('visible');
+        this.eventResolutionEl.setAttribute('aria-hidden', 'false');
+    }
+
+    hideResolution() {
+        if (!this.eventResolutionEl) return;
+        this.eventResolutionEl.classList.remove('visible');
+        this.eventResolutionEl.setAttribute('aria-hidden', 'true');
+    }
+
+    deriveResolutionFromText(text, round, isLoading = false) {
+        if (isLoading) {
+            return 'Narrativa en proceso...';
+        }
+
+        const normalized = (text || '').toLowerCase();
+        if (!normalized) {
+            return 'Evento registrado sin detalles adicionales.';
+        }
+
+        const cleanName = (raw) => raw
+            .replace(/^[^A-Za-zÀ-ÿ0-9]+/, '')
+            .trim();
+
+        const eliminationMatch = text.match(/([A-Za-zÀ-ÿ'’`´\-\s]+?)\s+(?:ha sido|queda|no resiste|cae)[^.!?]*eliminad/i);
+        if (eliminationMatch) {
+            const name = cleanName(eliminationMatch[1]);
+            if (name) {
+                return `Baja confirmada: ${name}.`;
+            }
+            return `Baja confirmada durante la ronda ${round}.`;
+        }
+
+        const injuryMatch = text.match(/([A-Za-zÀ-ÿ'’`´\-\s]+?)\s+(?:queda|resulta)[^.!?]*herid/i);
+        if (injuryMatch) {
+            const name = cleanName(injuryMatch[1]);
+            if (name) {
+                return `${name} queda herido.`;
+            }
+            return 'Se registran nuevas lesiones en la arena.';
+        }
+
+        if (normalized.includes('pierde') && normalized.includes('hp')) {
+            return 'Los puntos de vida de un combatiente han disminuido.';
+        }
+        if (normalized.includes('sin heridas') || normalized.includes('ileso') || normalized.includes('sin bajas')) {
+            return 'Sin bajas ni heridas tras el encuentro.';
+        }
+        if (normalized.includes('error')) {
+            return 'Evento alternativo aplicado por un fallo en la generación.';
+        }
+        if (normalized.includes('ganador') || normalized.includes('gana') || normalized.includes('victoria')) {
+            return 'La simulación alcanza su desenlace final.';
+        }
+
+        return 'El evento concluye sin novedades críticas.';
+    }
+
+    navigateEvent(step) {
+        if (!this.events.length) {
+            return;
+        }
+
+        if (this.isTyping && this.currentEventIndex >= 0) {
+            this.showEvent(this.currentEventIndex, { instant: true });
+        }
+
+        if (this.currentEventIndex < 0) {
+            this.showEvent(0, { instant: true });
+            return;
+        }
+
+        const targetIndex = Math.min(
+            Math.max(this.currentEventIndex + step, 0),
+            this.events.length - 1
+        );
+        if (targetIndex === this.currentEventIndex) {
+            this.updateEventControls();
+            return;
+        }
+        this.showEvent(targetIndex, { instant: true });
+    }
+
+    handleNextEventAction() {
+        if (this.isTyping && this.currentEventIndex >= 0) {
+            this.showEvent(this.currentEventIndex, { instant: true });
+            return;
+        }
+
+        const hasEvents = this.events.length > 0;
+        const atLatest = !hasEvents || this.currentEventIndex >= this.events.length - 1;
+
+        if (atLatest) {
+            if (this.gameRunning && !this.isProcessingEvent) {
+                this.runEventTurn();
+            }
+        } else {
+            this.navigateEvent(1);
+        }
     }
 
     renderPlayers() {
@@ -974,7 +1293,7 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
             this.populatePlayersConfig();
             this.hideModal(this.configModal);
             this.updateDisplay();
-            this.updateNextEventButton();
+            this.updateEventControls();
         } catch (error) {
             this.configErrorEl.textContent = error.message;
         }
@@ -1004,7 +1323,7 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
         }
         this.gameRunning = false;
         this.isProcessingEvent = false;
-        this.updateNextEventButton();
+        this.updateEventControls();
     }
 }
 
