@@ -723,7 +723,7 @@ Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos p
             visited.add(payload);
             const parts = payload
                 .map(item => this.normalizeEventText(item, visited))
-                .filter(part => typeof part === 'string' && part.trim().length > 0);
+                .filter(part => this.isMeaningfulEventText(part));
             visited.delete(payload);
             return parts.join('\n');
         }
@@ -737,28 +737,50 @@ Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos p
                 'text',
                 'story',
                 'details',
-                'event'
+                'event',
+                'title',
+                'body',
+                'outcome',
+                'ending',
+                'conclusion',
+                'resumen',
+                'descripcion',
+                'descripción',
+                'relato',
+                'detalle',
+                'detalles',
+                'conclusion',
+                'conclusión',
+                'desenlace'
             ];
 
+            const collected = [];
             for (const key of preferredKeys) {
                 if (Object.prototype.hasOwnProperty.call(payload, key)) {
                     const candidate = this.normalizeEventText(payload[key], visited);
-                    if (candidate && candidate.trim()) {
-                        visited.delete(payload);
-                        return candidate;
+                    if (this.isMeaningfulEventText(candidate)) {
+                        collected.push(candidate.trim());
                     }
                 }
             }
 
-            for (const value of Object.values(payload)) {
-                const candidate = this.normalizeEventText(value, visited);
-                if (candidate && candidate.trim()) {
-                    visited.delete(payload);
-                    return candidate;
+            if (!collected.length) {
+                const ignoredKeys = new Set(['round', 'ronda', 'turn', 'turno', 'id']);
+                for (const [key, value] of Object.entries(payload)) {
+                    if (ignoredKeys.has(key.toLowerCase())) {
+                        continue;
+                    }
+                    const candidate = this.normalizeEventText(value, visited);
+                    if (this.isMeaningfulEventText(candidate)) {
+                        collected.push(candidate.trim());
+                    }
                 }
             }
 
             visited.delete(payload);
+            if (collected.length) {
+                return collected.join('\n\n');
+            }
         }
 
         try {
@@ -767,6 +789,21 @@ Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos p
             console.warn('No se pudo convertir el evento a texto legible:', error);
             return String(payload);
         }
+    }
+
+    isMeaningfulEventText(candidate) {
+        if (typeof candidate !== 'string') {
+            return false;
+        }
+        const trimmed = candidate.trim();
+        if (!trimmed) {
+            return false;
+        }
+        const numericPattern = /^[+-]?\d+(?:[.,]\d+)?$/;
+        if (numericPattern.test(trimmed)) {
+            return false;
+        }
+        return true;
     }
 
     removeLoadingEvents() {
