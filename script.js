@@ -838,7 +838,21 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
             }
 
             if (!collected.length) {
-                const ignoredKeys = new Set(['round', 'ronda', 'turn', 'turno', 'id']);
+                const ignoredKeys = new Set([
+                    'round',
+                    'ronda',
+                    'turn',
+                    'turno',
+                    'id',
+                    'resolution',
+                    'resolucion',
+                    'resolución',
+                    'resolutiontext',
+                    'resolution_text',
+                    'texto_resolucion',
+                    'texto_resolución',
+                    'textoresolution'
+                ]);
                 for (const [key, value] of Object.entries(payload)) {
                     if (ignoredKeys.has(key.toLowerCase())) {
                         continue;
