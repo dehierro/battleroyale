@@ -225,7 +225,7 @@ class BattleRoyaleSimulator {
         formData.append('size', '512x512');
         if (referenceBlob) {
             const extension = this.inferExtension(referenceBlob.type);
-            formData.append('image[]', referenceBlob, `referencia.${extension}`);
+            formData.append('image', referenceBlob, `referencia.${extension}`);
         }
 
         const response = await fetch('https://api.openai.com/v1/images/edits', {
@@ -236,11 +236,26 @@ class BattleRoyaleSimulator {
             body: formData
         });
 
+        const responseBody = await response.text();
+
         if (!response.ok) {
-            throw new Error(`Error al generar imagen (${response.status})`);
+            let details = '';
+            try {
+                const parsed = JSON.parse(responseBody);
+                details = parsed?.error?.message || parsed?.message || '';
+            } catch (parseError) {
+                details = responseBody;
+            }
+            const suffix = details ? `: ${details}` : '';
+            throw new Error(`Error al generar imagen (${response.status})${suffix}`);
         }
 
-        const data = await response.json();
+        let data;
+        try {
+            data = JSON.parse(responseBody);
+        } catch (error) {
+            throw new Error('La API devolvió una respuesta no válida.');
+        }
         const base64 = data?.data?.[0]?.b64_json;
         if (!base64) {
             throw new Error('La API no devolvió una imagen válida.');
