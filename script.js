@@ -987,8 +987,8 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
     }
 
     checkForWinner() {
-        const alive = this.players.filter(player => player.status === 'alive');
-        if (alive.length <= 1) {
+        const survivors = this.players.filter(player => player.status !== 'dead');
+        if (survivors.length <= 1) {
             this.finishGame();
             return true;
         }
@@ -996,9 +996,9 @@ Genera una escena breve centrada exclusivamente en esos personajes. ${toneGuidan
     }
 
     finishGame() {
-        const alivePlayers = this.players.filter(player => player.status === 'alive');
-        if (alivePlayers.length === 1) {
-            this.addEvent(`🏆 ${alivePlayers[0].name} es el ganador de la simulación.`);
+        const survivors = this.players.filter(player => player.status !== 'dead');
+        if (survivors.length === 1) {
+            this.addEvent(`🏆 ${survivors[0].name} es el ganador de la simulación.`);
         } else {
             this.addEvent('🔥 No queda nadie en pie. La arena reclama a todos los combatientes.');
         }
