@@ -692,8 +692,81 @@ Genera una escena breve (máximo 120 palabras) centrada exclusivamente en esos p
     }
 
     addEvent(text, isLoading = false) {
-        this.events.push({ round: this.round, text, isLoading });
+        const normalizedText = typeof text === 'string'
+            ? text
+            : this.normalizeEventText(text);
+        const finalText = normalizedText && normalizedText.trim()
+            ? normalizedText.trim()
+            : 'Evento sin descripción disponible.';
+        this.events.push({ round: this.round, text: finalText, isLoading });
         this.renderEvents();
+    }
+
+    normalizeEventText(payload, visited = new Set()) {
+        if (payload === null || payload === undefined) {
+            return '';
+        }
+
+        const payloadType = typeof payload;
+        if (payloadType === 'string') {
+            return payload;
+        }
+        if (payloadType === 'number' || payloadType === 'boolean') {
+            return String(payload);
+        }
+
+        if (visited.has(payload)) {
+            return '';
+        }
+
+        if (Array.isArray(payload)) {
+            visited.add(payload);
+            const parts = payload
+                .map(item => this.normalizeEventText(item, visited))
+                .filter(part => typeof part === 'string' && part.trim().length > 0);
+            visited.delete(payload);
+            return parts.join('\n');
+        }
+
+        if (payloadType === 'object') {
+            visited.add(payload);
+            const preferredKeys = [
+                'summary',
+                'narrative',
+                'description',
+                'text',
+                'story',
+                'details',
+                'event'
+            ];
+
+            for (const key of preferredKeys) {
+                if (Object.prototype.hasOwnProperty.call(payload, key)) {
+                    const candidate = this.normalizeEventText(payload[key], visited);
+                    if (candidate && candidate.trim()) {
+                        visited.delete(payload);
+                        return candidate;
+                    }
+                }
+            }
+
+            for (const value of Object.values(payload)) {
+                const candidate = this.normalizeEventText(value, visited);
+                if (candidate && candidate.trim()) {
+                    visited.delete(payload);
+                    return candidate;
+                }
+            }
+
+            visited.delete(payload);
+        }
+
+        try {
+            return JSON.stringify(payload);
+        } catch (error) {
+            console.warn('No se pudo convertir el evento a texto legible:', error);
+            return String(payload);
+        }
     }
 
     removeLoadingEvents() {
