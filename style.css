@@ -389,6 +389,25 @@ button.primary {
     gap: 16px;
 }
 
+.players-grid.is-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    text-align: center;
+}
+
+.players-placeholder {
+    max-width: 340px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--panel-border);
+}
+
+.players-placeholder strong {
+    color: var(--accent);
+}
+
 .player-card {
     display: flex;
     flex-direction: column;
