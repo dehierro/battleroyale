@@ -54,14 +54,35 @@
             </section>
 
             <section class="timeline">
-                <div class="section-header with-action">
+                <div class="section-header">
                     <div>
                         <h2>Relato de eventos</h2>
                         <p class="section-subtitle">Cada turno se genera automáticamente usando el estado actual del juego y los antecedentes de los jugadores.</p>
                     </div>
-                    <button id="nextEvent" class="primary" disabled>Siguiente evento</button>
                 </div>
-                <div id="eventsLog" class="events-log"></div>
+                <div class="event-viewer" aria-live="polite">
+                    <div class="event-stage">
+                        <header class="event-meta">
+                            <span id="eventRound">Sin eventos</span>
+                            <span id="eventStatus" class="event-status">En reposo</span>
+                        </header>
+                        <p id="eventText" class="event-text-display">Inicia la simulación para comenzar a narrar la arena.</p>
+                    </div>
+                    <aside id="eventResolution" class="event-resolution" aria-hidden="true">
+                        <h3>Resolución</h3>
+                        <p id="eventResolutionText">Esperando el siguiente evento.</p>
+                    </aside>
+                </div>
+                <div class="event-controls">
+                    <button id="prevEvent" class="control-button" aria-label="Evento anterior" disabled>
+                        <span class="icon" aria-hidden="true">◀</span>
+                        <span class="control-label">Anterior</span>
+                    </button>
+                    <button id="nextEvent" class="control-button primary" aria-label="Generar evento" disabled>
+                        <span class="control-label">Generar</span>
+                        <span class="icon" aria-hidden="true">▶</span>
+                    </button>
+                </div>
             </section>
 
             <section class="players-panel">
